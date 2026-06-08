@@ -41,6 +41,23 @@ spring:
           min-idle: 0
           max-wait: -1
 
+  # 邮件发送配置（报警通知用）
+  mail:
+    host: smtp.163.com
+    port: 465
+    username: mine_safety@163.com
+    password: your_smtp_password
+    protocol: smtps
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          starttls:
+            enable: true
+            required: true
+
   kafka:
     bootstrap-servers: localhost:29092
     producer:

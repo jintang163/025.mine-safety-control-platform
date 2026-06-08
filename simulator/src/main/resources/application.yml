@@ -1,74 +1,120 @@
+# ===================================================================
+# 煤矿传感器数据模拟器 - 配置文件
+# 用于模拟井下传感器数据的独立程序配置
+# ===================================================================
+
+# 服务端口
 server:
   port: 8081
 
+# Spring应用配置
 spring:
   application:
     name: sensor-simulator
 
+# ===================================================================
+# 模拟器核心配置
+# ===================================================================
 simulator:
+  # 数据发送间隔（毫秒），默认1000ms = 1秒
   interval-ms: 1000
+
+  # 异常数据概率（0~1），默认2%，用于测试报警功能
   anomaly-rate: 0.02
+
+  # MQTT连接配置
   mqtt:
+    # EMQX Broker地址
     broker: tcp://localhost:1883
+    # 用户名
     username: admin
+    # 密码
     password: public
+    # 主题前缀，完整主题为：{topic-prefix}/{sensorId}
     topic-prefix: mine/sensor/data
+    # QoS等级：0-最多一次，1-至少一次，2-恰好一次
     qos: 1
+
+  # 模拟传感器列表
+  # 每个传感器配置包括：
+  #   id: 传感器ID（与数据库保持一致）
+  #   type: 传感器类型（GAS/DUST/CO/TEMPERATURE/WIND）
+  #   location: 安装位置
+  #   base-value: 基准值（数据围绕此值波动）
+  #   variance: 方差（数据波动幅度，高斯分布的标准差）
   sensors:
+    # 瓦斯传感器 - 1秒采样间隔
     - id: GAS-001
       type: GAS
       location: 回风巷工作面A
-      base-value: 0.5
+      base-value: 0.5    # 正常范围：0.3~0.7 % CH4
       variance: 0.2
+
     - id: GAS-002
       type: GAS
       location: 综采工作面C
-      base-value: 0.3
+      base-value: 0.3    # 正常范围：0.15~0.45 % CH4
       variance: 0.15
+
+    # 粉尘传感器 - 5秒采样间隔
     - id: DUST-001
       type: DUST
       location: 掘进工作面B
-      base-value: 100
+      base-value: 100    # 正常范围：50~150 mg/m³
       variance: 50
+
     - id: DUST-002
       type: DUST
       location: 主运输大巷
-      base-value: 80
+      base-value: 80     # 正常范围：40~120 mg/m³
       variance: 40
+
+    # 一氧化碳传感器 - 2秒采样间隔
     - id: CO-001
       type: CO
       location: 主运输大巷
-      base-value: 15
+      base-value: 15     # 正常范围：7~23 ppm
       variance: 8
+
     - id: CO-002
       type: CO
       location: 机电硐室
-      base-value: 10
+      base-value: 10     # 正常范围：5~15 ppm
       variance: 5
+
+    # 温度传感器 - 5秒采样间隔
     - id: TEMP-001
       type: TEMPERATURE
       location: 综采工作面C
-      base-value: 24
+      base-value: 24     # 正常范围：22~26 ℃
       variance: 2
+
     - id: TEMP-002
       type: TEMPERATURE
       location: 机电硐室
-      base-value: 28
+      base-value: 28     # 正常范围：25~31 ℃
       variance: 3
+
+    # 风速传感器 - 10秒采样间隔
     - id: WIND-001
       type: WIND
       location: 回风上山
-      base-value: 2.5
+      base-value: 2.5    # 正常范围：1.5~3.5 m/s
       variance: 1
+
     - id: WIND-002
       type: WIND
       location: 进风大巷
-      base-value: 3.0
+      base-value: 3.0    # 正常范围：1.8~4.2 m/s
       variance: 1.2
 
+# ===================================================================
+# 日志配置
+# ===================================================================
 logging:
   level:
     root: INFO
+    # 模拟器日志级别设为DEBUG，便于查看发送详情
     com.mine.simulator: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

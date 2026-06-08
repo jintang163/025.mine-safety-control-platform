@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  煤矿传感器数据模拟器 - Maven配置文件
+  独立的Spring Boot应用，用于模拟井下传感器数据并发送到MQTT Broker。
+
+  技术栈：
+    - Spring Boot 3.2.5
+    - Java 17
+    - Eclipse Paho MQTT Client 1.2.5
+    - FastJSON2 2.0.49
+    - Lombok
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- 继承Spring Boot父项目，获得依赖管理和插件配置 -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -11,35 +23,45 @@
         <relativePath/>
     </parent>
 
+    <!-- 项目基本信息 -->
     <groupId>com.mine</groupId>
     <artifactId>sensor-simulator</artifactId>
     <version>1.0.0</version>
     <name>sensor-simulator</name>
     <description>煤矿传感器数据模拟器</description>
 
+    <!-- 属性配置 -->
     <properties>
         <java.version>17</java.version>
         <eclipse-paho.version>1.2.5</eclipse-paho.version>
     </properties>
 
+    <!-- 依赖配置 -->
     <dependencies>
+        <!-- Spring Boot核心启动器 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
 
+        <!-- Eclipse Paho MQTT客户端库
+             用于连接EMQX Broker并发送传感器数据 -->
         <dependency>
             <groupId>org.eclipse.paho</groupId>
             <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
             <version>${eclipse-paho.version}</version>
         </dependency>
 
+        <!-- FastJSON2 JSON处理库
+             用于将传感器数据序列化为JSON格式 -->
         <dependency>
             <groupId>com.alibaba.fastjson2</groupId>
             <artifactId>fastjson2</artifactId>
             <version>2.0.49</version>
         </dependency>
 
+        <!-- Lombok注解库
+             用于简化POJO类的getter/setter等样板代码 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -47,8 +69,11 @@
         </dependency>
     </dependencies>
 
+    <!-- 构建配置 -->
     <build>
         <plugins>
+            <!-- Spring Boot Maven插件
+                 用于打包可执行的jar文件 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
