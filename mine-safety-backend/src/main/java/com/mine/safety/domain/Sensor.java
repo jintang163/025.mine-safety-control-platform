@@ -150,6 +150,13 @@ public class Sensor {
     private BigDecimal powerOffThreshold;
 
     /**
+     * 区域编码
+     * 关联 work_zones 表的 zone_code
+     */
+    @Column(name = "zone_code", length = 32)
+    private String zoneCode;
+
+    /**
      * 创建时间（自动生成）
      */
     @CreationTimestamp

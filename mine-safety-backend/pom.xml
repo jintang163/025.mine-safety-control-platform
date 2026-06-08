@@ -106,10 +106,26 @@
             <version>${netty.version}</version>
         </dependency>
 
-        <!-- Spring WebSocket -->
+
+
+        <!-- Flink Streaming -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-websocket</artifactId>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-streaming-java</artifactId>
+            <version>1.18.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-kafka</artifactId>
+            <version>3.1.0-1.18</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-connector-redis</artifactId>
+            <version>3.1.0-1.18</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>

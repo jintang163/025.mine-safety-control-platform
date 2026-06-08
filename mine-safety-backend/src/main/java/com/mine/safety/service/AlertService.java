@@ -6,6 +6,7 @@ import com.mine.safety.domain.AlertRule;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.dto.AlertDTO;
 import com.mine.safety.dto.SensorDataDTO;
+import com.mine.safety.dto.ThresholdDTO;
 import com.mine.safety.repository.AlertRepository;
 import com.mine.safety.repository.AlertRuleRepository;
 import com.mine.safety.repository.SensorRepository;
@@ -85,6 +86,11 @@ public class AlertService {
      * 实时监测服务
      */
     private final RealtimeMonitorService realtimeMonitorService;
+
+    /**
+     * 阈值缓存服务
+     */
+    private final ThresholdCacheService thresholdCacheService;
 
     /**
      * HTTP客户端，用于Webhook和短信API调用
@@ -183,7 +189,8 @@ public class AlertService {
 
     /**
      * 检查并触发报警
-     * 核心方法：对每条传感器数据进行规则匹配，满足条件则触发报警
+     * 核心方法：对每条传感器数据进行三级阈值检测和规则匹配，满足条件则触发报警
+     * 三级阈值优先级 > 规则引擎优先级
      *
      * @param dto 传感器数据DTO
      */
@@ -197,36 +204,87 @@ public class AlertService {
         realtimeMonitorService.updateSensorData(dto);
         webSocketPushService.pushSensorData(dto);
 
-        // 查询匹配的报警规则（按传感器类型或指定传感器ID）
-        List<AlertRule> rules = alertRuleRepository.findMatchingRules(sensorType, sensorId);
+        // 步骤1：优先进行三级阈值检测（从Redis缓存读取阈值）
+        ThresholdDTO threshold = thresholdCacheService.getThreshold(sensorId);
+        if (threshold != null) {
+            boolean thresholdTriggered = checkSensorThresholdsUnified(dto, threshold);
+            if (thresholdTriggered) {
+                // 三级阈值已触发，不再进行规则检测，避免重复报警
+                log.debug("三级阈值已触发报警，跳过规则引擎检测 - 传感器: {}", sensorId);
+                return;
+            }
+        }
 
+        // 步骤2：规则引擎检测（如果三级阈值未触发）
+        List<AlertRule> rules = alertRuleRepository.findMatchingRules(sensorType, sensorId);
         for (AlertRule rule : rules) {
-            // 跳过禁用的规则
             if (rule.getEnabled() != 1) continue;
 
-            // 步骤1：检查报警条件是否满足（阈值比较）
             boolean conditionMet = checkCondition(rule, value);
             if (!conditionMet) {
-                // 条件不满足，清空该规则的历史记录
                 clearHistory(sensorId, rule.getId());
                 continue;
             }
 
-            // 步骤2：检查持续时间条件（基于时间戳的时间窗口检测）
             boolean durationMet = checkDuration(sensorId, rule.getId(), rule.getDuration(), value, timestamp);
             if (!durationMet) {
-                // 持续时间不满足，等待下一条数据继续累积
                 continue;
             }
 
-            // 步骤3：检查冷却机制，避免短时间内重复报警
             if (!checkCooldown(sensorId, rule.getId())) {
                 continue;
             }
 
-            // 所有条件满足，触发报警
             triggerAlert(dto, rule, value);
         }
+    }
+
+    /**
+     * 三级阈值检测（统一方法）
+     * 与规则引擎合并，避免重复写库和双推送
+     *
+     * @param dto       传感器数据
+     * @param threshold 阈值配置（从Redis读取）
+     * @return 是否触发报警
+     */
+    private boolean checkSensorThresholdsUnified(SensorDataDTO dto, ThresholdDTO threshold) {
+        BigDecimal value = dto.getValue();
+        String alertLevel = null;
+        BigDecimal thresholdValue = null;
+        String ruleName = null;
+        String description = null;
+
+        if (threshold.getPowerOffThreshold() != null &&
+                value.compareTo(threshold.getPowerOffThreshold()) >= 0) {
+            alertLevel = Alert.AlertLevel.EMERGENCY.name();
+            thresholdValue = threshold.getPowerOffThreshold();
+            ruleName = threshold.getSensorType() + "浓度断电";
+            description = String.format("%s浓度超过断电阈值%s%s，需立即断电！",
+                    getSensorTypeName(threshold.getSensorType()),
+                    thresholdValue, getUnitByType(threshold.getSensorType()));
+        } else if (threshold.getAlarmThreshold() != null &&
+                value.compareTo(threshold.getAlarmThreshold()) >= 0) {
+            alertLevel = Alert.AlertLevel.ALERT.name();
+            thresholdValue = threshold.getAlarmThreshold();
+            ruleName = threshold.getSensorType() + "浓度报警";
+            description = String.format("%s浓度超过报警阈值%s%s，请及时处理！",
+                    getSensorTypeName(threshold.getSensorType()),
+                    thresholdValue, getUnitByType(threshold.getSensorType()));
+        } else if (threshold.getWarningThreshold() != null &&
+                value.compareTo(threshold.getWarningThreshold()) >= 0) {
+            alertLevel = Alert.AlertLevel.WARNING.name();
+            thresholdValue = threshold.getWarningThreshold();
+            ruleName = threshold.getSensorType() + "浓度预警";
+            description = String.format("%s浓度超过预警阈值%s%s，请注意关注！",
+                    getSensorTypeName(threshold.getSensorType()),
+                    thresholdValue, getUnitByType(threshold.getSensorType()));
+        }
+
+        if (alertLevel != null && checkThresholdCooldown(dto.getSensorId(), alertLevel)) {
+            triggerSensorThresholdAlert(dto, threshold, alertLevel, thresholdValue, ruleName, description);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -329,6 +387,28 @@ public class AlertService {
     }
 
     /**
+     * 检查阈值报警冷却机制
+     * 阈值报警使用独立的冷却key：sensorId:threshold:level
+     *
+     * @param sensorId 传感器ID
+     * @param level    报警级别
+     * @return true-可以触发，false-在冷却期内
+     */
+    private boolean checkThresholdCooldown(String sensorId, String level) {
+        String key = sensorId + ":threshold:" + level;
+        LocalDateTime lastTime = lastAlertTime.get(key);
+
+        if (lastTime != null) {
+            if (LocalDateTime.now().isBefore(lastTime.plusSeconds(cooldownSeconds))) {
+                return false;
+            }
+        }
+
+        lastAlertTime.put(key, LocalDateTime.now());
+        return true;
+    }
+
+    /**
      * 触发报警
      * 创建报警记录、发送Kafka事件、记录日志
      *
@@ -387,6 +467,63 @@ public class AlertService {
 
         log.warn("触发报警 - 编号: {}, 传感器: {}, 类型: {}, 值: {}, 级别: {}",
                 alert.getAlertNo(), sensorId, dto.getSensorType(), value, rule.getLevel());
+
+        return alert;
+    }
+
+    /**
+     * 触发传感器阈值报警
+     * 复用 triggerAlert 的核心逻辑，避免代码重复
+     *
+     * @param dto           传感器数据
+     * @param threshold     阈值配置
+     * @param alertLevel    报警级别
+     * @param thresholdValue 触发阈值
+     * @param ruleName      规则名称
+     * @param description   描述
+     * @return 报警实体
+     */
+    @Transactional
+    public Alert triggerSensorThresholdAlert(SensorDataDTO dto, ThresholdDTO threshold,
+                                             String alertLevel, BigDecimal thresholdValue,
+                                             String ruleName, String description) {
+        String sensorId = dto.getSensorId();
+
+        Alert existing = alertRepository.findActiveThresholdAlert(sensorId, alertLevel);
+        if (existing != null) {
+            alertRepository.updateAlertFrequency(existing.getId(), dto.getTimestamp());
+            log.debug("更新阈值报警频率 - 传感器: {}, 级别: {}", sensorId, alertLevel);
+            return existing;
+        }
+
+        Alert alert = new Alert();
+        alert.setAlertNo(generateAlertNo());
+        alert.setSensorId(sensorId);
+        alert.setSensorName(threshold.getSensorName());
+        alert.setSensorType(threshold.getSensorType());
+        alert.setLocation(dto.getLocation());
+        alert.setAlertValue(dto.getValue());
+        alert.setThresholdValue(thresholdValue);
+        alert.setLevel(alertLevel);
+        alert.setRuleId(0L);
+        alert.setRuleName(ruleName);
+        alert.setDescription(description);
+        alert.setStatus(Alert.AlertStatus.PENDING.getValue());
+        alert.setFirstAlertTime(dto.getTimestamp());
+        alert.setLastAlertTime(dto.getTimestamp());
+        alert.setAlertCount(1);
+
+        alert = alertRepository.save(alert);
+
+        AlertDTO alertDTO = convertToDTO(alert);
+        alertDTO.setNotificationChannels("SMS,EMAIL,VOICE,WEBHOOK");
+
+        kafkaProducerService.sendAlertEvent(alertDTO);
+        webSocketPushService.pushAlert(alertDTO);
+        processAlertNotification(alertDTO);
+
+        log.warn("阈值触发报警 - 编号: {}, 传感器: {}, 级别: {}, 值: {}, 阈值: {}",
+                alert.getAlertNo(), sensorId, alertLevel, dto.getValue(), thresholdValue);
 
         return alert;
     }
@@ -692,74 +829,6 @@ public class AlertService {
         dto.setLastAlertTime(alert.getLastAlertTime());
         dto.setAlertCount(alert.getAlertCount());
         return dto;
-    }
-
-    /**
-     * 基于传感器配置的三级阈值检测
-     * 与规则检测并行运行，直接使用传感器表中配置的预警、报警、断电阈值
-     *
-     * @param dto 传感器数据
-     */
-    @Transactional
-    public void checkSensorThresholds(SensorDataDTO dto) {
-        Sensor sensor = sensorRepository.findBySensorId(dto.getSensorId()).orElse(null);
-        if (sensor == null) return;
-
-        BigDecimal value = dto.getValue();
-        String alertLevel = null;
-        BigDecimal threshold = null;
-        String ruleName = null;
-        String description = null;
-
-        if (sensor.getPowerOffThreshold() != null && value.compareTo(sensor.getPowerOffThreshold()) >= 0) {
-            alertLevel = Alert.AlertLevel.EMERGENCY.name();
-            threshold = sensor.getPowerOffThreshold();
-            ruleName = sensor.getType() + "浓度断电";
-            description = String.format("%s浓度超过断电阈值%s%s，需立即断电！",
-                    getSensorTypeName(sensor.getType()), threshold, getUnitByType(sensor.getType()));
-        } else if (sensor.getAlarmThreshold() != null && value.compareTo(sensor.getAlarmThreshold()) >= 0) {
-            alertLevel = Alert.AlertLevel.ALERT.name();
-            threshold = sensor.getAlarmThreshold();
-            ruleName = sensor.getType() + "浓度报警";
-            description = String.format("%s浓度超过报警阈值%s%s，请及时处理！",
-                    getSensorTypeName(sensor.getType()), threshold, getUnitByType(sensor.getType()));
-        } else if (sensor.getWarningThreshold() != null && value.compareTo(sensor.getWarningThreshold()) >= 0) {
-            alertLevel = Alert.AlertLevel.WARNING.name();
-            threshold = sensor.getWarningThreshold();
-            ruleName = sensor.getType() + "浓度预警";
-            description = String.format("%s浓度超过预警阈值%s%s，请注意关注！",
-                    getSensorTypeName(sensor.getType()), threshold, getUnitByType(sensor.getType()));
-        }
-
-        if (alertLevel != null && checkCooldown(dto.getSensorId(), -1L)) {
-            Alert alert = new Alert();
-            alert.setAlertNo(generateAlertNo());
-            alert.setSensorId(dto.getSensorId());
-            alert.setSensorName(sensor.getName());
-            alert.setSensorType(sensor.getType());
-            alert.setLocation(dto.getLocation());
-            alert.setAlertValue(value);
-            alert.setThresholdValue(threshold);
-            alert.setLevel(alertLevel);
-            alert.setRuleName(ruleName);
-            alert.setDescription(description);
-            alert.setStatus(Alert.AlertStatus.PENDING.getValue());
-            alert.setFirstAlertTime(dto.getTimestamp());
-            alert.setLastAlertTime(dto.getTimestamp());
-            alert.setAlertCount(1);
-
-            alert = alertRepository.save(alert);
-
-            AlertDTO alertDTO = convertToDTO(alert);
-            alertDTO.setNotificationChannels("SMS,EMAIL,VOICE,WEBHOOK");
-
-            kafkaProducerService.sendAlertEvent(alertDTO);
-            webSocketPushService.pushAlert(alertDTO);
-            processAlertNotification(alertDTO);
-
-            log.warn("传感器阈值触发{} - 传感器: {}, 值: {}, 阈值: {}",
-                    alertLevel, dto.getSensorId(), value, threshold);
-        }
     }
 
     private String getSensorTypeName(String type) {

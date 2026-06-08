@@ -21,11 +21,13 @@ CREATE TABLE IF NOT EXISTS sensors (
     warning_threshold DECIMAL(10,4) COMMENT '预警阈值',
     alarm_threshold DECIMAL(10,4) COMMENT '报警阈值',
     power_off_threshold DECIMAL(10,4) COMMENT '断电阈值',
+    zone_code VARCHAR(32) COMMENT '区域编码',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_sensor_id (sensor_id),
     INDEX idx_type (type),
-    INDEX idx_status (status)
+    INDEX idx_status (status),
+    INDEX idx_zone_code (zone_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='传感器配置表';
 
 CREATE TABLE IF NOT EXISTS sensor_data (
@@ -129,17 +131,17 @@ CREATE TABLE IF NOT EXISTS system_config (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
 
-INSERT IGNORE INTO sensors (sensor_id, name, type, protocol, location, coordinates_x, coordinates_y, coordinates_z, sampling_interval, min_value, max_value, unit, warning_threshold, alarm_threshold, power_off_threshold) VALUES
-('GAS-001', '回风巷瓦斯传感器', 'GAS', 'MODBUS_RTU', '回风巷工作面A', 116.5, 39.8, 520.5, 1, 0, 4, '% CH4', 0.8, 1.0, 1.5),
-('GAS-002', '综采面瓦斯传感器', 'GAS', 'MODBUS_RTU', '综采工作面C', 116.51, 39.81, 518.3, 1, 0, 4, '% CH4', 0.8, 1.0, 1.5),
-('DUST-001', '掘进面粉尘传感器', 'DUST', 'MODBUS_RTU', '掘进工作面B', 116.49, 39.82, 525.1, 5, 0, 1000, 'mg/m³', 200, 500, 1000),
-('DUST-002', '运输巷粉尘传感器', 'DUST', 'MODBUS_TCP', '主运输大巷', 116.48, 39.79, 530.0, 5, 0, 1000, 'mg/m³', 200, 500, 1000),
-('CO-001', '主巷道CO传感器', 'CO', 'MODBUS_TCP', '主运输大巷', 116.48, 39.79, 530.0, 2, 0, 500, 'ppm', 24, 50, 100),
-('CO-002', '机电硐室CO传感器', 'CO', 'OPC_UA', '机电硐室', 116.47, 39.78, 535.5, 2, 0, 500, 'ppm', 24, 50, 100),
-('TEMP-001', '综采面温度传感器', 'TEMPERATURE', 'MODBUS_TCP', '综采工作面C', 116.51, 39.81, 518.3, 5, -5, 100, '℃', 26, 30, 35),
-('TEMP-002', '机电硐室温度传感器', 'TEMPERATURE', 'OPC_UA', '机电硐室', 116.47, 39.78, 535.5, 5, -5, 100, '℃', 30, 35, 40),
-('WIND-001', '通风巷风速传感器', 'WIND', 'MODBUS_RTU', '回风上山', 116.52, 39.83, 515.0, 10, 0, 15, 'm/s', 0.5, 0.3, 0.2),
-('WIND-002', '进风巷风速传感器', 'WIND', 'CAN', '进风大巷', 116.46, 39.77, 540.0, 10, 0, 15, 'm/s', 0.5, 0.3, 0.2);
+INSERT IGNORE INTO sensors (sensor_id, name, type, protocol, location, coordinates_x, coordinates_y, coordinates_z, sampling_interval, min_value, max_value, unit, warning_threshold, alarm_threshold, power_off_threshold, zone_code) VALUES
+('GAS-001', '回风巷瓦斯传感器', 'GAS', 'MODBUS_RTU', '回风巷工作面A', 116.5, 39.8, 520.5, 1, 0, 4, '% CH4', 0.8, 1.0, 1.5, 'ZONE-004'),
+('GAS-002', '综采面瓦斯传感器', 'GAS', 'MODBUS_RTU', '综采工作面C', 116.51, 39.81, 518.3, 1, 0, 4, '% CH4', 0.8, 1.0, 1.5, 'ZONE-002'),
+('DUST-001', '掘进面粉尘传感器', 'DUST', 'MODBUS_RTU', '掘进工作面B', 116.49, 39.82, 525.1, 5, 0, 1000, 'mg/m³', 200, 500, 1000, 'ZONE-003'),
+('DUST-002', '运输巷粉尘传感器', 'DUST', 'MODBUS_TCP', '主运输大巷', 116.48, 39.79, 530.0, 5, 0, 1000, 'mg/m³', 200, 500, 1000, 'ZONE-005'),
+('CO-001', '主巷道CO传感器', 'CO', 'MODBUS_TCP', '主运输大巷', 116.48, 39.79, 530.0, 2, 0, 500, 'ppm', 24, 50, 100, 'ZONE-005'),
+('CO-002', '机电硐室CO传感器', 'CO', 'OPC_UA', '机电硐室', 116.47, 39.78, 535.5, 2, 0, 500, 'ppm', 24, 50, 100, 'ZONE-006'),
+('TEMP-001', '综采面温度传感器', 'TEMPERATURE', 'MODBUS_TCP', '综采工作面C', 116.51, 39.81, 518.3, 5, -5, 100, '℃', 26, 30, 35, 'ZONE-002'),
+('TEMP-002', '机电硐室温度传感器', 'TEMPERATURE', 'OPC_UA', '机电硐室', 116.47, 39.78, 535.5, 5, -5, 100, '℃', 30, 35, 40, 'ZONE-006'),
+('WIND-001', '通风巷风速传感器', 'WIND', 'MODBUS_RTU', '回风上山', 116.52, 39.83, 515.0, 10, 0, 15, 'm/s', 0.5, 0.3, 0.2, 'ZONE-004'),
+('WIND-002', '进风巷风速传感器', 'WIND', 'CAN', '进风大巷', 116.46, 39.77, 540.0, 10, 0, 15, 'm/s', 0.5, 0.3, 0.2, 'ZONE-005');
 
 INSERT IGNORE INTO alert_rules (rule_name, sensor_type, condition_type, threshold_value, duration, level, enabled, notification_channels, description) VALUES
 ('瓦斯浓度预警', 'GAS', 'GTE', 0.8, 5, 'WARNING', 1, 'SMS,EMAIL,WEBHOOK', '瓦斯浓度超过0.8% CH4持续5秒触发预警'),

@@ -45,9 +45,7 @@ public class RealtimeMonitorService {
     }
 
     public RealtimeMonitorDTO.ZoneMonitorDTO getZoneMonitor(String zoneCode) {
-        List<Sensor> sensors = sensorRepository.findAll().stream()
-                .filter(s -> s.getLocation() != null && s.getLocation().contains(zoneCode))
-                .collect(Collectors.toList());
+        List<Sensor> sensors = sensorRepository.findByZoneCode(zoneCode);
 
         List<RealtimeMonitorDTO> sensorMonitors = new ArrayList<>();
         int alertCount = 0, warningCount = 0, emergencyCount = 0;
@@ -80,8 +78,8 @@ public class RealtimeMonitorService {
     public RealtimeMonitorDTO.MineMonitorDTO getMineMonitor() {
         List<Sensor> allSensors = sensorRepository.findAll();
         Map<String, List<Sensor>> zoneSensorMap = allSensors.stream()
-                .filter(s -> s.getLocation() != null)
-                .collect(Collectors.groupingBy(this::extractZoneCode));
+                .filter(s -> s.getZoneCode() != null)
+                .collect(Collectors.groupingBy(Sensor::getZoneCode));
 
         List<RealtimeMonitorDTO.ZoneMonitorDTO> zones = new ArrayList<>();
         int totalAlert = 0, totalWarning = 0, totalEmergency = 0;
@@ -122,8 +120,8 @@ public class RealtimeMonitorService {
             webSocketPushService.pushRealtimeMonitor(monitorData);
 
             Map<String, List<Sensor>> zoneSensorMap = sensorRepository.findAll().stream()
-                    .filter(s -> s.getLocation() != null)
-                    .collect(Collectors.groupingBy(this::extractZoneCode));
+                    .filter(s -> s.getZoneCode() != null)
+                    .collect(Collectors.groupingBy(Sensor::getZoneCode));
 
             for (String zoneCode : zoneSensorMap.keySet()) {
                 RealtimeMonitorDTO.ZoneMonitorDTO zoneMonitor = getZoneMonitor(zoneCode);
@@ -171,18 +169,6 @@ public class RealtimeMonitorService {
             return "WARNING";
         }
         return "NORMAL";
-    }
-
-    private String extractZoneCode(Sensor sensor) {
-        String location = sensor.getLocation();
-        if (location == null) return "UNKNOWN";
-
-        if (location.contains("综采")) return "ZONE-002";
-        if (location.contains("掘进")) return "ZONE-003";
-        if (location.contains("回风")) return "ZONE-004";
-        if (location.contains("运输") || location.contains("大巷")) return "ZONE-005";
-        if (location.contains("机电")) return "ZONE-006";
-        return "ZONE-001";
     }
 
     private String getZoneName(String zoneCode) {

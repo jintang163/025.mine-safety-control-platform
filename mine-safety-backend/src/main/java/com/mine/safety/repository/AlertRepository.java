@@ -87,6 +87,18 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
     Alert findActiveAlert(@Param("sensorId") String sensorId, @Param("ruleId") Long ruleId);
 
     /**
+     * 查询传感器阈值触发的活跃报警（ruleId = 0）
+     * 用于避免同一传感器的阈值报警重复创建
+     *
+     * @param sensorId 传感器ID
+     * @param level    报警级别
+     * @return 活跃的报警（如果存在）
+     */
+    @Query("SELECT a FROM Alert a WHERE a.sensorId = :sensorId AND a.ruleId = 0 " +
+           "AND a.level = :level AND a.status IN (0, 1) ORDER BY a.firstAlertTime DESC LIMIT 1")
+    Alert findActiveThresholdAlert(@Param("sensorId") String sensorId, @Param("level") String level);
+
+    /**
      * 确认/处理报警
      * 更新报警状态、处理人、处理时间和备注
      *

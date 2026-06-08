@@ -123,11 +123,15 @@ app:
     cooldown-seconds: 30
     sensor-threshold-check:
       enabled: true
-  websocket:
-    enabled: true
-    endpoint: /ws
-    allowed-origins: "*"
-    realtime-push-interval: 5000
+  netty:
+    websocket:
+      enabled: true
+      port: 8081
+      path: /ws
+      reader-idle-seconds: 60
+      writer-idle-seconds: 0
+      all-idle-seconds: 0
+      realtime-push-interval: 5000
   threshold:
     defaults:
       gas:

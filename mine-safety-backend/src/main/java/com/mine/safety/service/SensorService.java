@@ -96,6 +96,18 @@ public class SensorService {
     }
 
     /**
+     * 按区域编码查询传感器
+     *
+     * @param zoneCode 区域编码
+     * @return 该区域的传感器列表
+     */
+    public List<SensorDTO> getSensorsByZone(String zoneCode) {
+        return sensorRepository.findByZoneCode(zoneCode).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 根据传感器ID查询详情
      *
      * @param sensorId 传感器ID
@@ -138,6 +150,7 @@ public class SensorService {
         sensor.setWarningThreshold(dto.getWarningThreshold());
         sensor.setAlarmThreshold(dto.getAlarmThreshold());
         sensor.setPowerOffThreshold(dto.getPowerOffThreshold());
+        sensor.setZoneCode(dto.getZoneCode());
 
         sensor = sensorRepository.save(sensor);
         return convertToDTO(sensor);
@@ -172,6 +185,7 @@ public class SensorService {
         if (dto.getWarningThreshold() != null) sensor.setWarningThreshold(dto.getWarningThreshold());
         if (dto.getAlarmThreshold() != null) sensor.setAlarmThreshold(dto.getAlarmThreshold());
         if (dto.getPowerOffThreshold() != null) sensor.setPowerOffThreshold(dto.getPowerOffThreshold());
+        if (dto.getZoneCode() != null) sensor.setZoneCode(dto.getZoneCode());
 
         sensor = sensorRepository.save(sensor);
         return convertToDTO(sensor);
@@ -340,6 +354,7 @@ public class SensorService {
         dto.setWarningThreshold(sensor.getWarningThreshold());
         dto.setAlarmThreshold(sensor.getAlarmThreshold());
         dto.setPowerOffThreshold(sensor.getPowerOffThreshold());
+        dto.setZoneCode(sensor.getZoneCode());
         dto.setLastOnlineTime(sensor.getLastOnlineTime() != null ?
                 sensor.getLastOnlineTime().toString() : null);
         return dto;

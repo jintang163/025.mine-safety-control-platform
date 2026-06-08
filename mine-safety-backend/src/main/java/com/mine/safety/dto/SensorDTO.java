@@ -117,6 +117,11 @@ public class SensorDTO {
     private BigDecimal powerOffThreshold;
 
     /**
+     * 区域编码
+     */
+    private String zoneCode;
+
+    /**
      * 当前值（仅用于返回前端展示）
      */
     private BigDecimal currentValue;

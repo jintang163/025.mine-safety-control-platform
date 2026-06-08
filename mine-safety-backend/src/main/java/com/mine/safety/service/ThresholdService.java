@@ -1,6 +1,5 @@
 package com.mine.safety.service;
 
-import com.alibaba.fastjson2.JSON;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.domain.ThresholdApproval;
 import com.mine.safety.domain.ThresholdAudit;
@@ -13,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,7 +19,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,20 +29,12 @@ public class ThresholdService {
     private final SensorRepository sensorRepository;
     private final ThresholdAuditRepository thresholdAuditRepository;
     private final ThresholdApprovalRepository thresholdApprovalRepository;
-    private final StringRedisTemplate redisTemplate;
     private final WebSocketPushService webSocketPushService;
-
-    private static final String THRESHOLD_CACHE_PREFIX = "threshold:sensor:";
-    private static final long CACHE_EXPIRE_HOURS = 24;
+    private final ThresholdCacheService thresholdCacheService;
 
     @PostConstruct
     public void init() {
-        log.info("开始初始化阈值缓存...");
-        List<Sensor> sensors = sensorRepository.findAll();
-        for (Sensor sensor : sensors) {
-            cacheThreshold(sensor);
-        }
-        log.info("阈值缓存初始化完成，共 {} 个传感器", sensors.size());
+        log.info("ThresholdService初始化完成，阈值缓存由ThresholdCacheService负责");
     }
 
     public List<ThresholdDTO> getAllThresholds() {
@@ -61,26 +50,15 @@ public class ThresholdService {
     }
 
     public ThresholdDTO getThresholdBySensorId(String sensorId) {
-        String cacheKey = THRESHOLD_CACHE_PREFIX + sensorId;
-        try {
-            String cached = redisTemplate.opsForValue().get(cacheKey);
-            if (cached != null) {
-                return JSON.parseObject(cached, ThresholdDTO.class);
-            }
-        } catch (Exception e) {
-            log.warn("读取阈值缓存失败: {}", e.getMessage());
+        ThresholdDTO dto = thresholdCacheService.getThreshold(sensorId);
+        if (dto == null) {
+            throw new RuntimeException("传感器不存在: " + sensorId);
         }
-
-        Sensor sensor = sensorRepository.findBySensorId(sensorId)
-                .orElseThrow(() -> new RuntimeException("传感器不存在: " + sensorId));
-        ThresholdDTO dto = convertToThresholdDTO(sensor);
-        cacheThreshold(sensor);
         return dto;
     }
 
     public List<ThresholdDTO> getThresholdsByZone(String zoneCode) {
-        return sensorRepository.findAll().stream()
-                .filter(s -> s.getLocation() != null && s.getLocation().contains(zoneCode))
+        return sensorRepository.findByZoneCode(zoneCode).stream()
                 .map(this::convertToThresholdDTO)
                 .collect(Collectors.toList());
     }
@@ -161,7 +139,15 @@ public class ThresholdService {
         if (dto.getResult().equals(ThresholdApproval.ApprovalStatus.APPROVED.getValue())) {
             updateSensorThreshold(sensor, approval.getThresholdType(), approval.getNewValue());
             sensorRepository.save(sensor);
-            cacheThreshold(sensor);
+
+            /**
+             * 缓存刷新策略（审批通过后）：
+             * 1. 调用 thresholdCacheService.refreshThreshold(sensorId)
+             * 2. 该方法内部：先删除本地缓存和Redis缓存 -> 从DB加载最新值 -> 重新写入两级缓存
+             * 3. 保证下次读取时获得最新值，避免脏读
+             * 4. 刷新操作是原子的，不会出现中间状态
+             */
+            thresholdCacheService.refreshThreshold(approval.getSensorId());
 
             approval.setStatus(ThresholdApproval.ApprovalStatus.APPROVED.getValue());
 
@@ -170,11 +156,18 @@ public class ThresholdService {
                     dto.getApprover(), ThresholdAudit.OperationType.APPROVE.name(),
                     approval.getId(), dto.getApproveComment());
 
-            webSocketPushService.pushThresholdUpdate(convertToThresholdDTO(sensor));
+            ThresholdDTO updatedThreshold = thresholdCacheService.getThreshold(approval.getSensorId());
+            webSocketPushService.pushThresholdUpdate(updatedThreshold);
 
-            log.info("阈值调整已批准并生效 - 传感器: {}, 类型: {}, 新值: {}",
+            log.info("阈值调整已批准并生效 - 传感器: {}, 类型: {}, 新值: {}, 缓存已刷新",
                     approval.getSensorId(), approval.getThresholdType(), approval.getNewValue());
         } else {
+            /**
+             * 缓存刷新策略（审批拒绝后）：
+             * 1. 不修改数据库，因此不需要刷新缓存
+             * 2. 只记录审计日志
+             * 3. 缓存保持原有值不变
+             */
             approval.setStatus(ThresholdApproval.ApprovalStatus.REJECTED.getValue());
 
             recordAudit(approval.getSensorId(), approval.getThresholdType(),
@@ -250,17 +243,6 @@ public class ThresholdService {
         stats.put("rejectedCount", thresholdApprovalRepository.countByStatus(
                 ThresholdApproval.ApprovalStatus.REJECTED.getValue()));
         return stats;
-    }
-
-    private void cacheThreshold(Sensor sensor) {
-        String cacheKey = THRESHOLD_CACHE_PREFIX + sensor.getSensorId();
-        ThresholdDTO dto = convertToThresholdDTO(sensor);
-        try {
-            redisTemplate.opsForValue().set(cacheKey, JSON.toJSONString(dto),
-                    CACHE_EXPIRE_HOURS, TimeUnit.HOURS);
-        } catch (Exception e) {
-            log.warn("缓存阈值失败: {}", e.getMessage());
-        }
     }
 
     private BigDecimal getCurrentThreshold(Sensor sensor, String thresholdType) {

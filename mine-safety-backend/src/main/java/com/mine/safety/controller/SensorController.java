@@ -43,12 +43,15 @@ public class SensorController {
     @GetMapping
     public ApiResponse<List<SensorDTO>> getAllSensors(
             @RequestParam(required = false) String type,
-            @RequestParam(required = false) Integer status) {
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String zoneCode) {
         List<SensorDTO> sensors;
         if (type != null) {
             sensors = sensorService.getSensorsByType(type);
         } else if (status != null) {
             sensors = sensorService.getSensorsByStatus(status);
+        } else if (zoneCode != null) {
+            sensors = sensorService.getSensorsByZone(zoneCode);
         } else {
             sensors = sensorService.getAllSensors();
         }

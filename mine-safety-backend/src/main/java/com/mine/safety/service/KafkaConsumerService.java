@@ -95,9 +95,9 @@ public class KafkaConsumerService {
                     kafkaProducerService.sendProcessedSensorData(dto);
 
                     // 报警检测（仅对质量正常的数据）
+                    // checkAndTriggerAlert 已合并三级阈值检测和规则引擎检测
                     if (alertEnabled && dto.getQuality() == 1) {
                         alertService.checkAndTriggerAlert(dto);
-                        alertService.checkSensorThresholds(dto);
                     }
                 } catch (Exception e) {
                     // 单条消息处理失败不影响其他消息

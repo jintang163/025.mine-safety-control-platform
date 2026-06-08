@@ -91,4 +91,21 @@ public interface SensorRepository extends JpaRepository<Sensor, Long> {
     @Query("SELECT s FROM Sensor s WHERE s.status = :status AND s.lastOnlineTime < :timeout")
     List<Sensor> findSensorsToCheckOffline(@Param("status") Integer status,
                                             @Param("timeout") LocalDateTime timeout);
+
+    /**
+     * 根据区域编码查询传感器列表
+     *
+     * @param zoneCode 区域编码
+     * @return 传感器列表
+     */
+    List<Sensor> findByZoneCode(String zoneCode);
+
+    /**
+     * 根据区域编码和状态查询传感器列表
+     *
+     * @param zoneCode 区域编码
+     * @param status   状态
+     * @return 传感器列表
+     */
+    List<Sensor> findByZoneCodeAndStatus(String zoneCode, Integer status);
 }
