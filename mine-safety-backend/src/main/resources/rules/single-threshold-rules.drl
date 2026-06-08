@@ -1,0 +1,200 @@
+package com.mine.safety.rules
+
+import com.mine.safety.drools.RuleSensorData
+import java.math.BigDecimal
+
+global java.util.List alertResults
+
+rule "瓦斯浓度单阈值预警"
+    dialect "mvel"
+    no-loop true
+    salience 100
+    when
+        $data : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            warningThreshold != null,
+            value >= warningThreshold,
+            value < alarmThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("WARNING");
+        $data.setAlertRuleCode("RULE-SINGLE-GAS-WARNING");
+        $data.setAlertDescription("瓦斯浓度超过预警值: " + $data.getValue() + "% CH4 (预警阈值: " + $data.getWarningThreshold() + ")");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发瓦斯预警: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end
+
+rule "瓦斯浓度单阈值报警"
+    dialect "mvel"
+    no-loop true
+    salience 110
+    when
+        $data : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            alarmThreshold != null,
+            value >= alarmThreshold,
+            value < powerOffThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("ALERT");
+        $data.setAlertRuleCode("RULE-SINGLE-GAS-ALARM");
+        $data.setAlertDescription("瓦斯浓度超过报警值: " + $data.getValue() + "% CH4 (报警阈值: " + $data.getAlarmThreshold() + ")");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发瓦斯报警: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end
+
+rule "瓦斯浓度断电阈值"
+    dialect "mvel"
+    no-loop true
+    salience 120
+    when
+        $data : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            powerOffThreshold != null,
+            value >= powerOffThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("EMERGENCY");
+        $data.setAlertRuleCode("RULE-SINGLE-GAS-POWEROFF");
+        $data.setAlertDescription("瓦斯浓度超过断电值: " + $data.getValue() + "% CH4 (断电阈值: " + $data.getPowerOffThreshold() + ")，立即断电!");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发瓦斯断电: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end
+
+rule "粉尘浓度单阈值预警"
+    dialect "mvel"
+    no-loop true
+    salience 100
+    when
+        $data : RuleSensorData(
+            sensorType == "DUST",
+            enabled == true,
+            warningThreshold != null,
+            value >= warningThreshold,
+            value < alarmThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("WARNING");
+        $data.setAlertRuleCode("RULE-SINGLE-DUST-WARNING");
+        $data.setAlertDescription("粉尘浓度超过预警值: " + $data.getValue() + " mg/m³");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发粉尘预警: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end
+
+rule "粉尘浓度单阈值报警"
+    dialect "mvel"
+    no-loop true
+    salience 110
+    when
+        $data : RuleSensorData(
+            sensorType == "DUST",
+            enabled == true,
+            alarmThreshold != null,
+            value >= alarmThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("ALERT");
+        $data.setAlertRuleCode("RULE-SINGLE-DUST-ALARM");
+        $data.setAlertDescription("粉尘浓度超过报警值: " + $data.getValue() + " mg/m³");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发粉尘报警: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end
+
+rule "CO浓度单阈值预警"
+    dialect "mvel"
+    no-loop true
+    salience 100
+    when
+        $data : RuleSensorData(
+            sensorType == "CO",
+            enabled == true,
+            warningThreshold != null,
+            value >= warningThreshold,
+            value < alarmThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("WARNING");
+        $data.setAlertRuleCode("RULE-SINGLE-CO-WARNING");
+        $data.setAlertDescription("CO浓度超过预警值: " + $data.getValue() + " ppm");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发CO预警: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end
+
+rule "CO浓度单阈值报警"
+    dialect "mvel"
+    no-loop true
+    salience 110
+    when
+        $data : RuleSensorData(
+            sensorType == "CO",
+            enabled == true,
+            alarmThreshold != null,
+            value >= alarmThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("ALERT");
+        $data.setAlertRuleCode("RULE-SINGLE-CO-ALARM");
+        $data.setAlertDescription("CO浓度超过报警值: " + $data.getValue() + " ppm");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发CO报警: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end
+
+rule "温度单阈值预警"
+    dialect "mvel"
+    no-loop true
+    salience 100
+    when
+        $data : RuleSensorData(
+            sensorType == "TEMPERATURE",
+            enabled == true,
+            warningThreshold != null,
+            value >= warningThreshold,
+            value < alarmThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("WARNING");
+        $data.setAlertRuleCode("RULE-SINGLE-TEMP-WARNING");
+        $data.setAlertDescription("温度超过预警值: " + $data.getValue() + " ℃");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发温度预警: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end
+
+rule "温度单阈值报警"
+    dialect "mvel"
+    no-loop true
+    salience 110
+    when
+        $data : RuleSensorData(
+            sensorType == "TEMPERATURE",
+            enabled == true,
+            alarmThreshold != null,
+            value >= alarmThreshold,
+            alertTriggered == false
+        )
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("ALERT");
+        $data.setAlertRuleCode("RULE-SINGLE-TEMP-ALARM");
+        $data.setAlertDescription("温度超过报警值: " + $data.getValue() + " ℃");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发温度报警: 传感器=" + $data.getSensorId() + ", 值=" + $data.getValue());
+end

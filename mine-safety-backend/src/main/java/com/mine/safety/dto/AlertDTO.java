@@ -1,6 +1,9 @@
 package com.mine.safety.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,7 +24,12 @@ import java.time.LocalDateTime;
  *   - 通知渠道：需要发送的通知渠道（仅内部使用）
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class AlertDTO {
+
+    private Long id;
 
     /**
      * 报警编号，业务主键
@@ -50,6 +58,16 @@ public class AlertDTO {
     private String location;
 
     /**
+     * 区域编码
+     */
+    private String zoneCode;
+
+    /**
+     * 单位
+     */
+    private String unit;
+
+    /**
      * 触发报警时的传感器数值
      */
     private BigDecimal alertValue;
@@ -69,6 +87,11 @@ public class AlertDTO {
      * 关联的报警规则ID
      */
     private Long ruleId;
+
+    /**
+     * 规则编码
+     */
+    private String ruleCode;
 
     /**
      * 规则名称
@@ -122,4 +145,17 @@ public class AlertDTO {
      * 例如：SMS,EMAIL,VOICE,WEBHOOK
      */
     private String notificationChannels;
+
+    /**
+     * 获取报警级别文本
+     */
+    public String getLevelText() {
+        return switch (level) {
+            case "INFO" -> "提示";
+            case "WARNING" -> "预警";
+            case "ALERT" -> "报警";
+            case "EMERGENCY" -> "紧急";
+            default -> level;
+        };
+    }
 }

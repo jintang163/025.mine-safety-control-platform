@@ -1,0 +1,179 @@
+package com.mine.safety.rules
+
+import com.mine.safety.drools.RuleSensorData
+import java.math.BigDecimal
+import java.util.List
+
+global java.util.List alertResults
+
+rule "瓦斯+温度复合条件报警（紧急）"
+    dialect "mvel"
+    no-loop true
+    salience 150
+    when
+        $gasData : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            alertTriggered == false,
+            alarmThreshold != null,
+            value >= alarmThreshold,
+            $zoneCode : zoneCode
+        )
+        $tempData : RuleSensorData(
+            sensorType == "TEMPERATURE",
+            enabled == true,
+            alertTriggered == false,
+            alarmThreshold != null,
+            value >= alarmThreshold,
+            zoneCode == $zoneCode
+        )
+    then
+        $gasData.setAlertTriggered(true);
+        $gasData.setAlertLevel("EMERGENCY");
+        $gasData.setAlertRuleCode("RULE-COMPOUND-GAS-TEMP");
+        $gasData.setAlertDescription("复合报警: 瓦斯浓度=" + $gasData.getValue() + "% CH4 + 温度=" + $tempData.getValue() + "℃ 同时超标! 区域=" + $zoneCode + "，立即执行联动预案!");
+        alertResults.add($gasData);
+
+        $tempData.setAlertTriggered(true);
+        System.out.println("[Drools] 触发复合报警: 区域=" + $zoneCode + ", 瓦斯=" + $gasData.getValue() + ", 温度=" + $tempData.getValue());
+end
+
+rule "瓦斯+风速异常复合报警"
+    dialect "mvel"
+    no-loop true
+    salience 130
+    when
+        $gasData : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            alertTriggered == false,
+            warningThreshold != null,
+            value >= warningThreshold,
+            $zoneCode : zoneCode
+        )
+        $windData : RuleSensorData(
+            sensorType == "WIND",
+            enabled == true,
+            alertTriggered == false,
+            warningThreshold != null,
+            value <= warningThreshold,
+            zoneCode == $zoneCode
+        )
+    then
+        $gasData.setAlertTriggered(true);
+        $gasData.setAlertLevel("ALERT");
+        $gasData.setAlertRuleCode("RULE-COMPOUND-GAS-WIND");
+        $gasData.setAlertDescription("复合报警: 瓦斯浓度=" + $gasData.getValue() + "% CH4 + 风速=" + $windData.getValue() + "m/s 异常! 区域=" + $zoneCode + "，通风系统可能故障!");
+        alertResults.add($gasData);
+
+        $windData.setAlertTriggered(true);
+        System.out.println("[Drools] 触发瓦斯+风速复合报警: 区域=" + $zoneCode + ", 瓦斯=" + $gasData.getValue() + ", 风速=" + $windData.getValue());
+end
+
+rule "高瓦斯+高粉尘复合报警（综采工作面）"
+    dialect "mvel"
+    no-loop true
+    salience 120
+    when
+        $gasData : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            alertTriggered == false,
+            warningThreshold != null,
+            value >= warningThreshold,
+            $zoneCode : zoneCode
+        )
+        $dustData : RuleSensorData(
+            sensorType == "DUST",
+            enabled == true,
+            alertTriggered == false,
+            warningThreshold != null,
+            value >= warningThreshold,
+            zoneCode == $zoneCode
+        )
+    then
+        $gasData.setAlertTriggered(true);
+        $gasData.setAlertLevel("ALERT");
+        $gasData.setAlertRuleCode("RULE-COMPOUND-GAS-DUST");
+        $gasData.setAlertDescription("复合报警: 瓦斯浓度=" + $gasData.getValue() + "% CH4 + 粉尘浓度=" + $dustData.getValue() + " mg/m³ 同时超标! 区域=" + $zoneCode + "，存在爆炸风险!");
+        alertResults.add($gasData);
+
+        $dustData.setAlertTriggered(true);
+        System.out.println("[Drools] 触发瓦斯+粉尘复合报警: 区域=" + $zoneCode + ", 瓦斯=" + $gasData.getValue() + ", 粉尘=" + $dustData.getValue());
+end
+
+rule "CO+温度复合报警（可能火灾）"
+    dialect "mvel"
+    no-loop true
+    salience 140
+    when
+        $coData : RuleSensorData(
+            sensorType == "CO",
+            enabled == true,
+            alertTriggered == false,
+            alarmThreshold != null,
+            value >= alarmThreshold,
+            $zoneCode : zoneCode
+        )
+        $tempData : RuleSensorData(
+            sensorType == "TEMPERATURE",
+            enabled == true,
+            alertTriggered == false,
+            alarmThreshold != null,
+            value >= alarmThreshold,
+            zoneCode == $zoneCode
+        )
+    then
+        $coData.setAlertTriggered(true);
+        $coData.setAlertLevel("EMERGENCY");
+        $coData.setAlertRuleCode("RULE-COMPOUND-CO-TEMP");
+        $coData.setAlertDescription("复合报警(火灾预警): CO浓度=" + $coData.getValue() + "ppm + 温度=" + $tempData.getValue() + "℃ 同时超标! 区域=" + $zoneCode + "，可能发生自燃或火灾! 立即启动消防预案!");
+        alertResults.add($coData);
+
+        $tempData.setAlertTriggered(true);
+        System.out.println("[Drools] 触发CO+温度复合报警(火灾): 区域=" + $zoneCode + ", CO=" + $coData.getValue() + ", 温度=" + $tempData.getValue());
+end
+
+rule "多参数异常综合预警"
+    dialect "mvel"
+    no-loop true
+    salience 90
+    when
+        $gasData : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            alertTriggered == false,
+            warningThreshold != null,
+            value >= warningThreshold * 0.8,
+            value < warningThreshold,
+            $zoneCode : zoneCode
+        )
+        $dustData : RuleSensorData(
+            sensorType == "DUST",
+            enabled == true,
+            alertTriggered == false,
+            warningThreshold != null,
+            value >= warningThreshold * 0.8,
+            value < warningThreshold,
+            zoneCode == $zoneCode
+        )
+        $coData : RuleSensorData(
+            sensorType == "CO",
+            enabled == true,
+            alertTriggered == false,
+            warningThreshold != null,
+            value >= warningThreshold * 0.8,
+            value < warningThreshold,
+            zoneCode == $zoneCode
+        )
+    then
+        $gasData.setAlertTriggered(true);
+        $gasData.setAlertLevel("WARNING");
+        $gasData.setAlertRuleCode("RULE-COMPOUND-MULTI-PARAM");
+        $gasData.setAlertDescription("综合预警: 区域=" + $zoneCode + " 多个参数接近阈值: 瓦斯=" + $gasData.getValue() + ", 粉尘=" + $dustData.getValue() + ", CO=" + $coData.getValue() + "，请注意监控!");
+        alertResults.add($gasData);
+
+        $dustData.setAlertTriggered(true);
+        $coData.setAlertTriggered(true);
+        System.out.println("[Drools] 触发多参数综合预警: 区域=" + $zoneCode);
+end

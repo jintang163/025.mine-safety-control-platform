@@ -216,6 +216,69 @@ app:
         base-value: 3.0
         variance: 1.2
 
+  rule-engine:
+    enabled: true
+    drools:
+      rules-path: rules/
+      auto-reload: true
+      reload-interval-minutes: 30
+    trend-analysis:
+      enabled: true
+      max-history-size: 100
+      default-window-seconds: 10
+    cooldown:
+      enabled: true
+      default-seconds: 30
+
+  linkage:
+    enabled: true
+    thread-pool:
+      core-pool-size: 10
+      max-pool-size: 50
+      queue-capacity: 200
+    execution:
+      default-timeout-seconds: 30
+      default-max-retry: 3
+      default-retry-interval-seconds: 5
+    action:
+      sound-light-alarm:
+        default-pattern: ALARM_WARNING
+        default-duration-seconds: 120
+      voice-broadcast:
+        default-volume: 80
+        default-loop: 2
+      remote-power-off:
+        require-confirmation: true
+
+  plc:
+    enabled: true
+    default-timeout-ms: 5000
+    default-retries: 3
+    connection-pool:
+      max-size: 50
+      min-idle: 5
+    modbus:
+      default-port: 502
+      default-slave-id: 1
+
+  push:
+    wechat-work:
+      enabled: false
+      corp-id: wwxxxxxxxxxxxxxx
+      corp-secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      agent-id: 1000001
+    fcm:
+      enabled: false
+      service-account-key: xxxxxxxxxx
+      project-id: mine-safety-app
+      topic: alert-notifications
+    sms:
+      enabled: false
+      provider: aliyun
+      access-key: xxxxxxxxxx
+      secret-key: xxxxxxxxxx
+      sign-name: 煤矿安全平台
+
 logging:
   level:
     root: INFO

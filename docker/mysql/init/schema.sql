@@ -213,3 +213,207 @@ INSERT IGNORE INTO system_config (config_key, config_value, config_type, descrip
 ('influxdb.org', 'mine-safety', 'STRING', 'InfluxDB组织'),
 ('influxdb.bucket', 'sensor-data', 'STRING', 'InfluxDB Bucket'),
 ('data.cleanup.retention.days', '30', 'NUMBER', '数据保留天数');
+
+-- ==================== 报警规则引擎表 ====================
+
+CREATE TABLE IF NOT EXISTS alert_rule_definitions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    rule_code VARCHAR(64) NOT NULL UNIQUE COMMENT '规则编码',
+    rule_name VARCHAR(128) NOT NULL COMMENT '规则名称',
+    rule_type VARCHAR(32) NOT NULL COMMENT '规则类型: SINGLE_THRESHOLD,TREND,COMPOUND',
+    sensor_type VARCHAR(32) COMMENT '传感器类型',
+    sensor_id VARCHAR(64) COMMENT '指定传感器ID',
+    zone_code VARCHAR(32) COMMENT '区域编码',
+    drools_rule TEXT COMMENT 'Drools规则内容',
+    groovy_script TEXT COMMENT 'Groovy脚本内容',
+    rule_params JSON COMMENT '规则参数(JSON)',
+    level VARCHAR(16) NOT NULL COMMENT '报警级别: INFO,WARNING,ALERT,EMERGENCY',
+    description VARCHAR(512) COMMENT '规则描述',
+    enabled TINYINT DEFAULT 1 COMMENT '是否启用: 0-禁用, 1-启用',
+    version INT DEFAULT 1 COMMENT '版本号',
+    created_by VARCHAR(64) COMMENT '创建人',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(64) COMMENT '更新人',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_rule_code (rule_code),
+    INDEX idx_rule_type (rule_type),
+    INDEX idx_sensor_type (sensor_type),
+    INDEX idx_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报警规则定义表';
+
+-- ==================== 联动控制表 ====================
+
+CREATE TABLE IF NOT EXISTS linkage_actions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    action_code VARCHAR(64) NOT NULL UNIQUE COMMENT '动作编码',
+    action_name VARCHAR(128) NOT NULL COMMENT '动作名称',
+    action_type VARCHAR(32) NOT NULL COMMENT '动作类型: SOUND_LIGHT_ALARM,VOICE_BROADCAST,REMOTE_POWER_OFF,MESSAGE_PUSH,VIDEO_POPUP',
+    target_type VARCHAR(32) COMMENT '目标类型: ZONE,SENSOR,DEVICE,USER',
+    target_code VARCHAR(64) COMMENT '目标编码',
+    action_params JSON COMMENT '动作参数(JSON)',
+    execution_mode VARCHAR(16) DEFAULT 'PARALLEL' COMMENT '执行模式: SERIAL-串行, PARALLEL-并行',
+    priority INT DEFAULT 0 COMMENT '优先级: 0-低, 1-中, 2-高',
+    timeout_seconds INT DEFAULT 30 COMMENT '超时时间(秒)',
+    max_retry INT DEFAULT 3 COMMENT '最大重试次数',
+    retry_interval_seconds INT DEFAULT 5 COMMENT '重试间隔(秒)',
+    enabled TINYINT DEFAULT 1 COMMENT '是否启用: 0-禁用, 1-启用',
+    description VARCHAR(512) COMMENT '动作描述',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_action_code (action_code),
+    INDEX idx_action_type (action_type),
+    INDEX idx_target_type (target_type),
+    INDEX idx_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='联动动作定义表';
+
+CREATE TABLE IF NOT EXISTS alert_rule_action_relations (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    rule_id BIGINT NOT NULL COMMENT '规则ID',
+    rule_code VARCHAR(64) NOT NULL COMMENT '规则编码',
+    action_id BIGINT NOT NULL COMMENT '动作ID',
+    action_code VARCHAR(64) NOT NULL COMMENT '动作编码',
+    execution_order INT DEFAULT 0 COMMENT '执行顺序',
+    delay_seconds INT DEFAULT 0 COMMENT '延迟执行(秒)',
+    condition_expression VARCHAR(512) COMMENT '执行条件表达式',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_rule_id (rule_id),
+    INDEX idx_action_id (action_id),
+    UNIQUE KEY uk_rule_action (rule_id, action_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='规则动作关联表';
+
+CREATE TABLE IF NOT EXISTS linkage_execution_records (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    execution_no VARCHAR(64) NOT NULL UNIQUE COMMENT '执行编号',
+    rule_id BIGINT COMMENT '触发规则ID',
+    rule_code VARCHAR(64) COMMENT '触发规则编码',
+    alert_id BIGINT COMMENT '关联报警ID',
+    action_id BIGINT NOT NULL COMMENT '动作ID',
+    action_code VARCHAR(64) NOT NULL COMMENT '动作编码',
+    action_type VARCHAR(32) NOT NULL COMMENT '动作类型',
+    target_type VARCHAR(32) COMMENT '目标类型',
+    target_code VARCHAR(64) COMMENT '目标编码',
+    action_params JSON COMMENT '执行时参数',
+    request_payload TEXT COMMENT '请求报文',
+    response_payload TEXT COMMENT '响应报文',
+    status TINYINT DEFAULT 0 COMMENT '状态: 0-待执行, 1-执行中, 2-成功, 3-失败, 4-超时, 5-已取消',
+    retry_count INT DEFAULT 0 COMMENT '已重试次数',
+    execution_start_time DATETIME COMMENT '执行开始时间',
+    execution_end_time DATETIME COMMENT '执行结束时间',
+    duration_ms BIGINT COMMENT '执行耗时(毫秒)',
+    error_msg VARCHAR(1024) COMMENT '错误信息',
+    operator VARCHAR(64) COMMENT '触发人: SYSTEM/USERNAME',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_execution_no (execution_no),
+    INDEX idx_alert_id (alert_id),
+    INDEX idx_rule_id (rule_id),
+    INDEX idx_action_id (action_id),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='联动执行记录表';
+
+-- ==================== PLC设备表 ====================
+
+CREATE TABLE IF NOT EXISTS plc_devices (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    device_code VARCHAR(64) NOT NULL UNIQUE COMMENT '设备编码',
+    device_name VARCHAR(128) NOT NULL COMMENT '设备名称',
+    device_type VARCHAR(32) NOT NULL COMMENT '设备类型: PLC_SOUND_LIGHT,PLC_BROADCAST,PLC_POWER_CONTROL,PLC_OTHER',
+    protocol VARCHAR(32) NOT NULL COMMENT '通讯协议: MODBUS_TCP,OPC_UA,S7,MODBUS_RTU',
+    ip_address VARCHAR(64) COMMENT 'IP地址',
+    port INT COMMENT '端口号',
+    slave_id INT DEFAULT 1 COMMENT '从站地址',
+    rack INT DEFAULT 0 COMMENT '机架号(S7)',
+    slot INT DEFAULT 1 COMMENT '槽号(S7)',
+    register_address VARCHAR(64) COMMENT '寄存器地址',
+    register_type VARCHAR(32) COMMENT '寄存器类型: COIL,HOLDING_REGISTER,INPUT_REGISTER',
+    data_type VARCHAR(32) DEFAULT 'BOOL' COMMENT '数据类型: BOOL,INT16,INT32,FLOAT',
+    zone_code VARCHAR(32) COMMENT '所属区域',
+    location VARCHAR(256) COMMENT '安装位置',
+    on_value VARCHAR(32) DEFAULT '1' COMMENT '开启值',
+    off_value VARCHAR(32) DEFAULT '0' COMMENT '关闭值',
+    status TINYINT DEFAULT 1 COMMENT '状态: 0-离线, 1-在线, 2-故障',
+    last_online_time DATETIME COMMENT '最后在线时间',
+    enabled TINYINT DEFAULT 1 COMMENT '是否启用: 0-禁用, 1-启用',
+    description VARCHAR(512) COMMENT '设备描述',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_device_code (device_code),
+    INDEX idx_device_type (device_type),
+    INDEX idx_protocol (protocol),
+    INDEX idx_zone_code (zone_code),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='PLC设备表';
+
+-- ==================== 消息推送配置表 ====================
+
+CREATE TABLE IF NOT EXISTS message_push_configs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    config_code VARCHAR(64) NOT NULL UNIQUE COMMENT '配置编码',
+    config_name VARCHAR(128) NOT NULL COMMENT '配置名称',
+    push_channel VARCHAR(32) NOT NULL COMMENT '推送渠道: WECHAT_WORK,FCM,SMS,EMAIL,APP',
+    channel_params JSON COMMENT '渠道参数(JSON)',
+    target_users VARCHAR(1024) COMMENT '目标用户列表(逗号分隔)',
+    target_roles VARCHAR(512) COMMENT '目标角色列表(逗号分隔)',
+    template_code VARCHAR(64) COMMENT '消息模板编码',
+    enabled TINYINT DEFAULT 1 COMMENT '是否启用: 0-禁用, 1-启用',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_config_code (config_code),
+    INDEX idx_push_channel (push_channel),
+    INDEX idx_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息推送配置表';
+
+-- ==================== 初始化数据 ====================
+
+INSERT IGNORE INTO alert_rule_definitions (rule_code, rule_name, rule_type, sensor_type, level, description, rule_params, enabled) VALUES
+('RULE-SINGLE-GAS-WARNING', '瓦斯浓度单阈值预警', 'SINGLE_THRESHOLD', 'GAS', 'WARNING', '瓦斯浓度超过0.8%预警', '{"threshold":0.8,"operator":"GTE","duration":5}', 1),
+('RULE-SINGLE-GAS-ALARM', '瓦斯浓度单阈值报警', 'SINGLE_THRESHOLD', 'GAS', 'ALERT', '瓦斯浓度超过1.0%报警', '{"threshold":1.0,"operator":"GTE","duration":3}', 1),
+('RULE-TREND-GAS-RISE', '瓦斯浓度趋势报警', 'TREND', 'GAS', 'ALERT', '瓦斯浓度10秒内上升速度>0.2%/s', '{"windowSeconds":10,"riseRate":0.2,"unit":"%/s"}', 1),
+('RULE-COMPOUND-GAS-TEMP', '瓦斯+温度复合报警', 'COMPOUND', NULL, 'EMERGENCY', '瓦斯和温度同时超标', '{"conditions":[{"sensorType":"GAS","operator":"GTE","threshold":1.0},{"sensorType":"TEMPERATURE","operator":"GTE","threshold":30}]}', 1),
+('RULE-SINGLE-DUST-WARNING', '粉尘浓度单阈值预警', 'SINGLE_THRESHOLD', 'DUST', 'WARNING', '粉尘浓度超过200mg/m³预警', '{"threshold":200,"operator":"GTE","duration":10}', 1),
+('RULE-SINGLE-CO-ALARM', 'CO浓度单阈值报警', 'SINGLE_THRESHOLD', 'CO', 'ALERT', 'CO浓度超过50ppm报警', '{"threshold":50,"operator":"GTE","duration":3}', 1);
+
+INSERT IGNORE INTO plc_devices (device_code, device_name, device_type, protocol, ip_address, port, slave_id, register_address, register_type, zone_code, location, description, enabled) VALUES
+('PLC-SOUND-001', '综采面声光报警器', 'PLC_SOUND_LIGHT', 'MODBUS_TCP', '192.168.1.101', 502, 1, '00001', 'COIL', 'ZONE-002', '综采工作面A', '综采工作面声光报警设备', 1),
+('PLC-SOUND-002', '掘进面声光报警器', 'PLC_SOUND_LIGHT', 'MODBUS_TCP', '192.168.1.102', 502, 1, '00001', 'COIL', 'ZONE-003', '掘进工作面B', '掘进工作面声光报警设备', 1),
+('PLC-SOUND-003', '回风巷声光报警器', 'PLC_SOUND_LIGHT', 'MODBUS_TCP', '192.168.1.103', 502, 1, '00001', 'COIL', 'ZONE-004', '回风巷', '回风巷声光报警设备', 1),
+('PLC-BROADCAST-001', '主巷道语音广播', 'PLC_BROADCAST', 'MODBUS_TCP', '192.168.1.111', 502, 1, '00002', 'COIL', 'ZONE-005', '主运输大巷', '主巷道语音广播系统', 1),
+('PLC-POWER-001', '综采面供电控制', 'PLC_POWER_CONTROL', 'MODBUS_TCP', '192.168.1.121', 502, 1, '00010', 'COIL', 'ZONE-002', '综采工作面A', '综采工作面远程断电控制', 1),
+('PLC-POWER-002', '掘进面供电控制', 'PLC_POWER_CONTROL', 'MODBUS_TCP', '192.168.1.122', 502, 1, '00010', 'COIL', 'ZONE-003', '掘进工作面B', '掘进工作面远程断电控制', 1),
+('PLC-POWER-003', '机电硐室供电控制', 'PLC_POWER_CONTROL', 'MODBUS_TCP', '192.168.1.123', 502, 1, '00010', 'COIL', 'ZONE-006', '机电硐室', '机电硐室远程断电控制', 1);
+
+INSERT IGNORE INTO linkage_actions (action_code, action_name, action_type, target_type, target_code, action_params, execution_mode, priority, timeout_seconds, max_retry, retry_interval_seconds, description, enabled) VALUES
+('ACTION-SOUND-ALL', '全矿井声光报警', 'SOUND_LIGHT_ALARM', 'ZONE', 'ZONE-001', '{"pattern":"ALARM_EMERGENCY","duration":300}', 'PARALLEL', 2, 30, 3, 5, '触发全矿井声光报警器', 1),
+('ACTION-SOUND-ZONE', '区域声光报警', 'SOUND_LIGHT_ALARM', 'ZONE', NULL, '{"pattern":"ALARM_WARNING","duration":120}', 'PARALLEL', 1, 30, 2, 5, '触发指定区域声光报警器', 1),
+('ACTION-BROADCAST-EVACUATE', '语音广播-撤离指令', 'VOICE_BROADCAST', 'ZONE', NULL, '{"audioFile":"evacuate_instruction.mp3","loop":3,"volume":100}', 'PARALLEL', 2, 60, 3, 10, '向指定区域广播语音撤离指令', 1),
+('ACTION-BROADCAST-WARNING', '语音广播-预警通知', 'VOICE_BROADCAST', 'ZONE', NULL, '{"audioFile":"warning_notice.mp3","loop":2,"volume":80}', 'PARALLEL', 1, 60, 2, 10, '向指定区域广播预警通知', 1),
+('ACTION-POWER-OFF-ZONE', '区域远程断电', 'REMOTE_POWER_OFF', 'ZONE', NULL, '{"confirm":true,"reason":"报警联动断电"}', 'SERIAL', 2, 120, 3, 30, '切断指定区域非安全电源', 1),
+('ACTION-POWER-OFF-SENSOR', '传感器关联设备断电', 'REMOTE_POWER_OFF', 'SENSOR', NULL, '{"confirm":true,"reason":"报警联动断电"}', 'SERIAL', 2, 120, 3, 30, '切断传感器关联设备电源', 1),
+('ACTION-PUSH-SAFETY', '推送安全员手环/APP', 'MESSAGE_PUSH', 'ROLE', 'SAFETY_OFFICER', '{"channels":["APP","WECHAT_WORK"],"urgent":true}', 'PARALLEL', 1, 30, 2, 5, '推送报警信息至安全员手环和手机APP', 1),
+('ACTION-PUSH-MANAGER', '推送管理人员', 'MESSAGE_PUSH', 'ROLE', 'MINE_MANAGER', '{"channels":["WECHAT_WORK","SMS"],"urgent":true}', 'PARALLEL', 1, 30, 2, 5, '推送报警信息至管理人员', 1),
+('ACTION-VIDEO-POPUP', '视频监控弹出', 'VIDEO_POPUP', 'ZONE', NULL, '{"monitorCodes":[],"popupDuration":60,"layout":"4x4"}', 'PARALLEL', 0, 15, 1, 5, '监控中心弹出对应区域视频画面', 1);
+
+INSERT IGNORE INTO alert_rule_action_relations (rule_id, rule_code, action_id, action_code, execution_order, delay_seconds) VALUES
+(1, 'RULE-SINGLE-GAS-WARNING', 2, 'ACTION-SOUND-ZONE', 1, 0),
+(1, 'RULE-SINGLE-GAS-WARNING', 4, 'ACTION-BROADCAST-WARNING', 2, 0),
+(1, 'RULE-SINGLE-GAS-WARNING', 7, 'ACTION-PUSH-SAFETY', 3, 0),
+(2, 'RULE-SINGLE-GAS-ALARM', 2, 'ACTION-SOUND-ZONE', 1, 0),
+(2, 'RULE-SINGLE-GAS-ALARM', 3, 'ACTION-BROADCAST-EVACUATE', 2, 0),
+(2, 'RULE-SINGLE-GAS-ALARM', 5, 'ACTION-POWER-OFF-ZONE', 3, 5),
+(2, 'RULE-SINGLE-GAS-ALARM', 7, 'ACTION-PUSH-SAFETY', 4, 0),
+(2, 'RULE-SINGLE-GAS-ALARM', 8, 'ACTION-PUSH-MANAGER', 5, 0),
+(2, 'RULE-SINGLE-GAS-ALARM', 9, 'ACTION-VIDEO-POPUP', 6, 0),
+(3, 'RULE-TREND-GAS-RISE', 2, 'ACTION-SOUND-ZONE', 1, 0),
+(3, 'RULE-TREND-GAS-RISE', 3, 'ACTION-BROADCAST-EVACUATE', 2, 0),
+(3, 'RULE-TREND-GAS-RISE', 7, 'ACTION-PUSH-SAFETY', 3, 0),
+(4, 'RULE-COMPOUND-GAS-TEMP', 1, 'ACTION-SOUND-ALL', 1, 0),
+(4, 'RULE-COMPOUND-GAS-TEMP', 3, 'ACTION-BROADCAST-EVACUATE', 2, 0),
+(4, 'RULE-COMPOUND-GAS-TEMP', 5, 'ACTION-POWER-OFF-ZONE', 3, 3),
+(4, 'RULE-COMPOUND-GAS-TEMP', 7, 'ACTION-PUSH-SAFETY', 4, 0),
+(4, 'RULE-COMPOUND-GAS-TEMP', 8, 'ACTION-PUSH-MANAGER', 5, 0),
+(4, 'RULE-COMPOUND-GAS-TEMP', 9, 'ACTION-VIDEO-POPUP', 6, 0);
+
+INSERT IGNORE INTO message_push_configs (config_code, config_name, push_channel, channel_params, target_roles, enabled) VALUES
+('PUSH-WECHAT-WORK', '企业微信推送', 'WECHAT_WORK', '{"corpId":"wwxxxxxxxxxxxxxx","corpSecret":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","agentId":1000001}', 'SAFETY_OFFICER,MINE_MANAGER,SHIFT_SUPERVISOR', 1),
+('PUSH-FCM-APP', '手机APP推送', 'FCM', '{"serviceAccountKey":"xxxxxxxxxx","projectId":"mine-safety-app"}', 'SAFETY_OFFICER,MINE_MANAGER,SHIFT_SUPERVISOR', 1),
+('PUSH-SMS', '短信推送', 'SMS', '{"provider":"aliyun","accessKey":"xxxxxxxxxx","secretKey":"xxxxxxxxxx","signName":"煤矿安全平台"}', 'MINE_MANAGER,SAFETY_DIRECTOR', 1);

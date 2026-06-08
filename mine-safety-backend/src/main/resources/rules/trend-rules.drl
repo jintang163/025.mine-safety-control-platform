@@ -1,0 +1,144 @@
+package com.mine.safety.rules
+
+import com.mine.safety.drools.RuleSensorData
+import java.math.BigDecimal
+
+global java.util.List alertResults
+
+rule "瓦斯浓度趋势快速上升报警"
+    dialect "mvel"
+    no-loop true
+    salience 115
+    when
+        $data : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            alertTriggered == false,
+            historyData != null,
+            historyData.size >= 10
+        )
+        $rate : BigDecimal() from $data.calculateRateOfChange(10)
+        eval($rate.compareTo(new BigDecimal("0.2")) >= 0)
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("ALERT");
+        $data.setAlertRuleCode("RULE-TREND-GAS-RISE");
+        $data.setAlertDescription("瓦斯浓度上升过快: 10秒内上升速度=" + $rate + "%/s，超过阈值0.2%/s，当前值=" + $data.getValue() + "% CH4");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发瓦斯趋势报警: 传感器=" + $data.getSensorId() + ", 上升速率=" + $rate + "%/s");
+end
+
+rule "瓦斯浓度持续上升预警"
+    dialect "mvel"
+    no-loop true
+    salience 105
+    when
+        $data : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            alertTriggered == false,
+            historyData != null,
+            historyData.size >= 20
+        )
+        $rate : BigDecimal() from $data.calculateRateOfChange(30)
+        eval($rate.compareTo(new BigDecimal("0.05")) >= 0 && $rate.compareTo(new BigDecimal("0.2")) < 0)
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("WARNING");
+        $data.setAlertRuleCode("RULE-TREND-GAS-RISE-WARNING");
+        $data.setAlertDescription("瓦斯浓度持续上升: 30秒内上升速度=" + $rate + "%/s，当前值=" + $data.getValue() + "% CH4");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发瓦斯趋势预警: 传感器=" + $data.getSensorId() + ", 上升速率=" + $rate + "%/s");
+end
+
+rule "瓦斯浓度快速下降预警"
+    dialect "mvel"
+    no-loop true
+    salience 105
+    when
+        $data : RuleSensorData(
+            sensorType == "GAS",
+            enabled == true,
+            alertTriggered == false,
+            historyData != null,
+            historyData.size >= 10
+        )
+        $rate : BigDecimal() from $data.calculateRateOfChange(10)
+        eval($rate.compareTo(new BigDecimal("-0.3")) <= 0)
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("WARNING");
+        $data.setAlertRuleCode("RULE-TREND-GAS-DROP");
+        $data.setAlertDescription("瓦斯浓度急剧下降: 10秒内下降速度=" + $rate + "%/s，可能存在通风异常，当前值=" + $data.getValue() + "% CH4");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发瓦斯下降预警: 传感器=" + $data.getSensorId() + ", 下降速率=" + $rate + "%/s");
+end
+
+rule "粉尘浓度趋势上升报警"
+    dialect "mvel"
+    no-loop true
+    salience 115
+    when
+        $data : RuleSensorData(
+            sensorType == "DUST",
+            enabled == true,
+            alertTriggered == false,
+            historyData != null,
+            historyData.size >= 10
+        )
+        $rate : BigDecimal() from $data.calculateRateOfChange(10)
+        eval($rate.compareTo(new BigDecimal("20")) >= 0)
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("ALERT");
+        $data.setAlertRuleCode("RULE-TREND-DUST-RISE");
+        $data.setAlertDescription("粉尘浓度快速上升: 10秒内上升速度=" + $rate + " mg/m³/s，超过阈值20 mg/m³/s");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发粉尘趋势报警: 传感器=" + $data.getSensorId() + ", 上升速率=" + $rate);
+end
+
+rule "CO浓度趋势快速上升报警"
+    dialect "mvel"
+    no-loop true
+    salience 115
+    when
+        $data : RuleSensorData(
+            sensorType == "CO",
+            enabled == true,
+            alertTriggered == false,
+            historyData != null,
+            historyData.size >= 10
+        )
+        $rate : BigDecimal() from $data.calculateRateOfChange(10)
+        eval($rate.compareTo(new BigDecimal("5")) >= 0)
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("ALERT");
+        $data.setAlertRuleCode("RULE-TREND-CO-RISE");
+        $data.setAlertDescription("CO浓度快速上升: 10秒内上升速度=" + $rate + " ppm/s，超过阈值5 ppm/s，可能存在火灾隐患!");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发CO趋势报警: 传感器=" + $data.getSensorId() + ", 上升速率=" + $rate);
+end
+
+rule "温度趋势快速上升报警"
+    dialect "mvel"
+    no-loop true
+    salience 115
+    when
+        $data : RuleSensorData(
+            sensorType == "TEMPERATURE",
+            enabled == true,
+            alertTriggered == false,
+            historyData != null,
+            historyData.size >= 10
+        )
+        $rate : BigDecimal() from $data.calculateRateOfChange(10)
+        eval($rate.compareTo(new BigDecimal("0.5")) >= 0)
+    then
+        $data.setAlertTriggered(true);
+        $data.setAlertLevel("ALERT");
+        $data.setAlertRuleCode("RULE-TREND-TEMP-RISE");
+        $data.setAlertDescription("温度快速上升: 10秒内上升速度=" + $rate + " ℃/s，超过阈值0.5 ℃/s，可能存在设备过热或火灾隐患!");
+        alertResults.add($data);
+        System.out.println("[Drools] 触发温度趋势报警: 传感器=" + $data.getSensorId() + ", 上升速率=" + $rate);
+end
