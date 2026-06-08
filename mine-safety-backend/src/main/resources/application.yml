@@ -1,0 +1,174 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: mine-safety-backend
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/mine_safety?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: mine_safety
+    password: mine_safety_2024
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: mine_safety_2024
+      timeout: 3000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1
+
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: 1
+      retries: 3
+      batch-size: 16384
+      linger-ms: 10
+      properties:
+        max.in.flight.requests.per.connection: 5
+        enable.idempotence: true
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: mine-safety-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 500
+      properties:
+        max.poll.interval.ms: 300000
+        session.timeout.ms: 30000
+    listener:
+      ack-mode: manual
+      concurrency: 4
+
+mqtt:
+  broker:
+    url: tcp://localhost:1883
+    client-id: mine-safety-backend
+    username: admin
+    password: public
+    connection-timeout: 30
+    keep-alive-interval: 60
+    auto-reconnect: true
+    clean-session: false
+  topics:
+    sensor-data: mine/sensor/data
+    alarm: mine/alarm/#
+    command: mine/command/#
+
+influxdb:
+  url: http://localhost:8086
+  token: mine-safety-token-2024
+  org: mine-safety
+  bucket: sensor-data
+  connect-timeout: 10
+  read-timeout: 30
+  write-timeout: 10
+  batch-size: 500
+  flush-interval: 500
+
+app:
+  data-processing:
+    enabled: true
+    denoise-alpha: 0.3
+    anomaly-detection:
+      enabled: true
+      z-score-threshold: 3.0
+      max-outliers: 0.1
+  alert:
+    enabled: true
+    cooldown-seconds: 30
+    notification:
+      sms:
+        enabled: false
+        api-url: ""
+        api-key: ""
+      email:
+        enabled: false
+        smtp-host: ""
+        smtp-port: 587
+      voice:
+        enabled: false
+      webhook:
+        enabled: true
+        urls:
+          - http://localhost:8080/api/alerts/webhook
+  simulator:
+    enabled: false
+    interval-seconds: 1
+    sensors:
+      - id: GAS-001
+        type: GAS
+        base-value: 0.5
+        variance: 0.2
+      - id: GAS-002
+        type: GAS
+        base-value: 0.3
+        variance: 0.15
+      - id: DUST-001
+        type: DUST
+        base-value: 100
+        variance: 50
+      - id: DUST-002
+        type: DUST
+        base-value: 80
+        variance: 40
+      - id: CO-001
+        type: CO
+        base-value: 15
+        variance: 8
+      - id: CO-002
+        type: CO
+        base-value: 10
+        variance: 5
+      - id: TEMP-001
+        type: TEMPERATURE
+        base-value: 24
+        variance: 2
+      - id: TEMP-002
+        type: TEMPERATURE
+        base-value: 28
+        variance: 3
+      - id: WIND-001
+        type: WIND
+        base-value: 2.5
+        variance: 1
+      - id: WIND-002
+        type: WIND
+        base-value: 3.0
+        variance: 1.2
+
+logging:
+  level:
+    root: INFO
+    com.mine.safety: DEBUG
+    org.springframework.kafka: INFO
+    org.eclipse.paho: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

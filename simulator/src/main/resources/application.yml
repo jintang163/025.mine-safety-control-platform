@@ -1,0 +1,74 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: sensor-simulator
+
+simulator:
+  interval-ms: 1000
+  anomaly-rate: 0.02
+  mqtt:
+    broker: tcp://localhost:1883
+    username: admin
+    password: public
+    topic-prefix: mine/sensor/data
+    qos: 1
+  sensors:
+    - id: GAS-001
+      type: GAS
+      location: 回风巷工作面A
+      base-value: 0.5
+      variance: 0.2
+    - id: GAS-002
+      type: GAS
+      location: 综采工作面C
+      base-value: 0.3
+      variance: 0.15
+    - id: DUST-001
+      type: DUST
+      location: 掘进工作面B
+      base-value: 100
+      variance: 50
+    - id: DUST-002
+      type: DUST
+      location: 主运输大巷
+      base-value: 80
+      variance: 40
+    - id: CO-001
+      type: CO
+      location: 主运输大巷
+      base-value: 15
+      variance: 8
+    - id: CO-002
+      type: CO
+      location: 机电硐室
+      base-value: 10
+      variance: 5
+    - id: TEMP-001
+      type: TEMPERATURE
+      location: 综采工作面C
+      base-value: 24
+      variance: 2
+    - id: TEMP-002
+      type: TEMPERATURE
+      location: 机电硐室
+      base-value: 28
+      variance: 3
+    - id: WIND-001
+      type: WIND
+      location: 回风上山
+      base-value: 2.5
+      variance: 1
+    - id: WIND-002
+      type: WIND
+      location: 进风大巷
+      base-value: 3.0
+      variance: 1.2
+
+logging:
+  level:
+    root: INFO
+    com.mine.simulator: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

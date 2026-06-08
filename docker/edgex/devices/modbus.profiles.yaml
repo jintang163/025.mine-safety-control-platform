@@ -1,0 +1,159 @@
+name: mine-gas-sensor
+manufacturer: MineSafety
+model: GJC4
+description: 矿用瓦斯浓度传感器 - 测量范围0-4%CH4
+labels:
+  - gas
+  - CH4
+deviceResources:
+  - name: gas_concentration
+    description: 瓦斯浓度值 (CH4 %)
+    properties:
+      valueType: Float32
+      readWrite: R
+      minimum: 0
+      maximum: 4
+      defaultValue: 0
+      unit: "% CH4"
+    attributes:
+      primaryTable: "HOLDING_REGISTERS"
+      startingAddress: 0
+      quantity: 2
+      dataType: "FLOAT32"
+      scale: 0.001
+
+deviceCommands:
+  - name: readGas
+    isHidden: false
+    readWrite: R
+    resourceOperations:
+      - deviceResource: gas_concentration
+
+---
+name: mine-dust-sensor
+manufacturer: MineSafety
+model: GCG1000
+description: 矿用粉尘浓度传感器 - 测量范围0-1000mg/m³
+labels:
+  - dust
+  - PM2.5
+  - PM10
+deviceResources:
+  - name: dust_concentration
+    description: 粉尘浓度值 (mg/m³)
+    properties:
+      valueType: Float32
+      readWrite: R
+      minimum: 0
+      maximum: 1000
+      defaultValue: 0
+      unit: "mg/m³"
+    attributes:
+      primaryTable: "HOLDING_REGISTERS"
+      startingAddress: 0
+      quantity: 2
+      dataType: "FLOAT32"
+      scale: 0.01
+
+deviceCommands:
+  - name: readDust
+    isHidden: false
+    readWrite: R
+    resourceOperations:
+      - deviceResource: dust_concentration
+
+---
+name: mine-co-sensor
+manufacturer: MineSafety
+model: GTH500
+description: 矿用一氧化碳传感器 - 测量范围0-500ppm
+labels:
+  - co
+  - carbon-monoxide
+deviceResources:
+  - name: co_concentration
+    description: 一氧化碳浓度值 (ppm)
+    properties:
+      valueType: Float32
+      readWrite: R
+      minimum: 0
+      maximum: 500
+      defaultValue: 0
+      unit: "ppm"
+    attributes:
+      primaryTable: "HOLDING_REGISTERS"
+      startingAddress: 0
+      quantity: 2
+      dataType: "FLOAT32"
+      scale: 0.1
+
+deviceCommands:
+  - name: readCO
+    isHidden: false
+    readWrite: R
+    resourceOperations:
+      - deviceResource: co_concentration
+
+---
+name: mine-temp-sensor
+manufacturer: MineSafety
+model: GWD100
+description: 矿用温度传感器 - 测量范围-5~100℃
+labels:
+  - temperature
+  - env
+deviceResources:
+  - name: temperature
+    description: 环境温度 (℃)
+    properties:
+      valueType: Float32
+      readWrite: R
+      minimum: -5
+      maximum: 100
+      defaultValue: 25
+      unit: "℃"
+    attributes:
+      primaryTable: "HOLDING_REGISTERS"
+      startingAddress: 0
+      quantity: 2
+      dataType: "FLOAT32"
+      scale: 0.01
+
+deviceCommands:
+  - name: readTemperature
+    isHidden: false
+    readWrite: R
+    resourceOperations:
+      - deviceResource: temperature
+
+---
+name: mine-wind-sensor
+manufacturer: MineSafety
+model: GFY15
+description: 矿用风速传感器 - 测量范围0.3-15m/s
+labels:
+  - wind
+  - airflow
+deviceResources:
+  - name: wind_speed
+    description: 风速值 (m/s)
+    properties:
+      valueType: Float32
+      readWrite: R
+      minimum: 0
+      maximum: 15
+      defaultValue: 0
+      unit: "m/s"
+    attributes:
+      primaryTable: "HOLDING_REGISTERS"
+      startingAddress: 0
+      quantity: 2
+      dataType: "FLOAT32"
+      scale: 0.001
+
+deviceCommands:
+  - name: readWindSpeed
+    isHidden: false
+    readWrite: R
+    resourceOperations:
+      - deviceResource: wind_speed

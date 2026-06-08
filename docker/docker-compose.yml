@@ -1,0 +1,279 @@
+version: '3.8'
+
+services:
+  emqx:
+    image: emqx/emqx:5.7.0
+    container_name: mine-safety-emqx
+    ports:
+      - "1883:1883"
+      - "8083:8083"
+      - "8084:8084"
+      - "8883:8883"
+      - "18083:18083"
+    environment:
+      - EMQX_NAME=mine-safety-emqx
+      - EMQX_HOST=0.0.0.0
+      - EMQX_ALLOW_ANONYMOUS=true
+      - EMQX_LISTENER__TCP__EXTERNAL=1883
+      - EMQX_LISTENER__WS__EXTERNAL=8083
+    volumes:
+      - ./emqx/data:/opt/emqx/data
+      - ./emqx/log:/opt/emqx/log
+      - ./emqx/etc:/opt/emqx/etc
+    networks:
+      - mine-safety-network
+    healthcheck:
+      test: ["CMD", "emqx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: mine-safety-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - mine-safety-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: mine-safety-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - ./kafka/data:/var/lib/kafka/data
+    networks:
+      - mine-safety-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: mine-safety-kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: "true"
+      KAFKA_CLUSTERS_0_NAME: mine-safety-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - mine-safety-network
+
+  influxdb:
+    image: influxdb:2.7.10
+    container_name: mine-safety-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: mine_safety_2024
+      DOCKER_INFLUXDB_INIT_ORG: mine-safety
+      DOCKER_INFLUXDB_INIT_BUCKET: sensor-data
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: mine-safety-token-2024
+    volumes:
+      - ./influxdb/data:/var/lib/influxdb2
+      - ./influxdb/config:/etc/influxdb2
+    networks:
+      - mine-safety-network
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    image: mysql:8.0
+    container_name: mine-safety-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: mine_safety_2024
+      MYSQL_DATABASE: mine_safety
+      MYSQL_USER: mine_safety
+      MYSQL_PASSWORD: mine_safety_2024
+    volumes:
+      - ./mysql/data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - mine-safety-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pmine_safety_2024"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: mine-safety-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass mine_safety_2024 --appendonly yes
+    volumes:
+      - ./redis/data:/data
+    networks:
+      - mine-safety-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  edgex-core-data:
+    image: edgexfoundry/core-data:3.1.0
+    container_name: edgex-core-data
+    depends_on:
+      - redis
+    ports:
+      - "59880:59880"
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      CLIENTS_COREDATA_HOST: edgex-core-data
+      CLIENTS_COMMAND_HOST: edgex-core-command
+      CLIENTS_METADATA_HOST: edgex-core-metadata
+      DATABASES_PRIMARY_HOST: redis
+      DATABASES_PRIMARY_PORT: 6379
+    networks:
+      - mine-safety-network
+
+  edgex-core-metadata:
+    image: edgexfoundry/core-metadata:3.1.0
+    container_name: edgex-core-metadata
+    depends_on:
+      - redis
+    ports:
+      - "59881:59881"
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      CLIENTS_COREDATA_HOST: edgex-core-data
+      CLIENTS_COMMAND_HOST: edgex-core-command
+      CLIENTS_METADATA_HOST: edgex-core-metadata
+      DATABASES_PRIMARY_HOST: redis
+      DATABASES_PRIMARY_PORT: 6379
+    networks:
+      - mine-safety-network
+
+  edgex-core-command:
+    image: edgexfoundry/core-command:3.1.0
+    container_name: edgex-core-command
+    depends_on:
+      - redis
+      - edgex-core-metadata
+    ports:
+      - "59882:59882"
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      CLIENTS_COREDATA_HOST: edgex-core-data
+      CLIENTS_COMMAND_HOST: edgex-core-command
+      CLIENTS_METADATA_HOST: edgex-core-metadata
+      DATABASES_PRIMARY_HOST: redis
+      DATABASES_PRIMARY_PORT: 6379
+    networks:
+      - mine-safety-network
+
+  edgex-device-modbus:
+    image: edgexfoundry/device-modbus:3.1.0
+    container_name: edgex-device-modbus
+    depends_on:
+      - edgex-core-data
+      - edgex-core-metadata
+    ports:
+      - "59901:59901"
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      CLIENTS_COREDATA_HOST: edgex-core-data
+      CLIENTS_COMMAND_HOST: edgex-core-command
+      CLIENTS_METADATA_HOST: edgex-core-metadata
+      DATABASES_PRIMARY_HOST: redis
+      DATABASES_PRIMARY_PORT: 6379
+    volumes:
+      - ./edgex/devices:/res/devices
+    networks:
+      - mine-safety-network
+
+  edgex-device-opcua:
+    image: edgexfoundry/device-opcua:3.1.0
+    container_name: edgex-device-opcua
+    depends_on:
+      - edgex-core-data
+      - edgex-core-metadata
+    ports:
+      - "59903:59903"
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      CLIENTS_COREDATA_HOST: edgex-core-data
+      CLIENTS_COMMAND_HOST: edgex-core-command
+      CLIENTS_METADATA_HOST: edgex-core-metadata
+      DATABASES_PRIMARY_HOST: redis
+      DATABASES_PRIMARY_PORT: 6379
+    volumes:
+      - ./edgex/devices:/res/devices
+    networks:
+      - mine-safety-network
+
+  edgex-app-service-configurable:
+    image: edgexfoundry/app-service-configurable:3.1.0
+    container_name: edgex-app-mqtt
+    depends_on:
+      - edgex-core-data
+      - emqx
+    ports:
+      - "59701:59701"
+    environment:
+      EDGEX_SECURITY_SECRET_STORE: "false"
+      CLIENTS_COREDATA_HOST: edgex-core-data
+      CLIENTS_COMMAND_HOST: edgex-core-command
+      CLIENTS_METADATA_HOST: edgex-core-metadata
+      TRIGGER_EDGEX_MESSAGEBUS_SUBSCRIBEHOST_HOST: redis
+      TRIGGER_EDGEX_MESSAGEBUS_SUBSCRIBEHOST_PORT: 6379
+      WRITABLE_PIPELINE_FUNCTIONS_MQTTEXPORT_PARAMETERS_BROKERADDRESS: "tcp://emqx:1883"
+      WRITABLE_PIPELINE_FUNCTIONS_MQTTEXPORT_PARAMETERS_TOPIC: "mine/sensor/data"
+      WRITABLE_PIPELINE_FUNCTIONS_MQTTEXPORT_PARAMETERS_CLIENTID: "edgex-mqtt-bridge"
+      WRITABLE_LOGLEVEL: "INFO"
+      EDGEX_PROFILE: "mqtt-export"
+    networks:
+      - mine-safety-network
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: mine-safety-grafana
+    depends_on:
+      - influxdb
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: mine_safety_2024
+    volumes:
+      - ./grafana/data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - mine-safety-network
+
+networks:
+  mine-safety-network:
+    driver: bridge
+    name: mine-safety-network

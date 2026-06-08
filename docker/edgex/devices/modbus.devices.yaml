@@ -1,0 +1,81 @@
+deviceList:
+  - name: gas-sensor-001
+    profileName: mine-gas-sensor
+    description: 瓦斯浓度传感器 - 回风巷
+    labels:
+      - gas
+      - modbus
+      - RTU
+    location: 回风巷工作面A
+    protocols:
+      modbus-rtu:
+        Address: 1
+        BaudRate: 9600
+        DataBits: 8
+        StopBits: 1
+        Parity: N
+        Timeout: 5000
+
+  - name: dust-sensor-001
+    profileName: mine-dust-sensor
+    description: 粉尘浓度传感器 - 掘进面
+    labels:
+      - dust
+      - modbus
+      - RTU
+    location: 掘进工作面B
+    protocols:
+      modbus-rtu:
+        Address: 2
+        BaudRate: 9600
+        DataBits: 8
+        StopBits: 1
+        Parity: N
+        Timeout: 5000
+
+  - name: co-sensor-001
+    profileName: mine-co-sensor
+    description: 一氧化碳传感器 - 主巷道
+    labels:
+      - co
+      - modbus
+      - TCP
+    location: 主运输大巷
+    protocols:
+      modbus-tcp:
+        Address: 192.168.1.101
+        Port: 502
+        UnitID: 3
+        Timeout: 5000
+
+  - name: temp-sensor-001
+    profileName: mine-temp-sensor
+    description: 温度传感器 - 综采面
+    labels:
+      - temperature
+      - modbus
+      - TCP
+    location: 综采工作面C
+    protocols:
+      modbus-tcp:
+        Address: 192.168.1.102
+        Port: 502
+        UnitID: 4
+        Timeout: 5000
+
+  - name: wind-sensor-001
+    profileName: mine-wind-sensor
+    description: 风速传感器 - 通风巷
+    labels:
+      - wind
+      - modbus
+      - RTU
+    location: 回风上山
+    protocols:
+      modbus-rtu:
+        Address: 5
+        BaudRate: 9600
+        DataBits: 8
+        StopBits: 1
+        Parity: N
+        Timeout: 5000
