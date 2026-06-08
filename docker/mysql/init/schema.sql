@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS sensors (
     last_online_time DATETIME COMMENT '最后在线时间',
     warning_threshold DECIMAL(10,4) COMMENT '预警阈值',
     alarm_threshold DECIMAL(10,4) COMMENT '报警阈值',
+    power_off_threshold DECIMAL(10,4) COMMENT '断电阈值',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_sensor_id (sensor_id),
@@ -128,17 +129,17 @@ CREATE TABLE IF NOT EXISTS system_config (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
 
-INSERT IGNORE INTO sensors (sensor_id, name, type, protocol, location, coordinates_x, coordinates_y, coordinates_z, sampling_interval, min_value, max_value, unit, warning_threshold, alarm_threshold) VALUES
-('GAS-001', '回风巷瓦斯传感器', 'GAS', 'MODBUS_RTU', '回风巷工作面A', 116.5, 39.8, 520.5, 1, 0, 4, '% CH4', 0.8, 1.0),
-('GAS-002', '综采面瓦斯传感器', 'GAS', 'MODBUS_RTU', '综采工作面C', 116.51, 39.81, 518.3, 1, 0, 4, '% CH4', 0.8, 1.0),
-('DUST-001', '掘进面粉尘传感器', 'DUST', 'MODBUS_RTU', '掘进工作面B', 116.49, 39.82, 525.1, 5, 0, 1000, 'mg/m³', 200, 500),
-('DUST-002', '运输巷粉尘传感器', 'DUST', 'MODBUS_TCP', '主运输大巷', 116.48, 39.79, 530.0, 5, 0, 1000, 'mg/m³', 200, 500),
-('CO-001', '主巷道CO传感器', 'CO', 'MODBUS_TCP', '主运输大巷', 116.48, 39.79, 530.0, 2, 0, 500, 'ppm', 24, 50),
-('CO-002', '机电硐室CO传感器', 'CO', 'OPC_UA', '机电硐室', 116.47, 39.78, 535.5, 2, 0, 500, 'ppm', 24, 50),
-('TEMP-001', '综采面温度传感器', 'TEMPERATURE', 'MODBUS_TCP', '综采工作面C', 116.51, 39.81, 518.3, 5, -5, 100, '℃', 26, 30),
-('TEMP-002', '机电硐室温度传感器', 'TEMPERATURE', 'OPC_UA', '机电硐室', 116.47, 39.78, 535.5, 5, -5, 100, '℃', 30, 35),
-('WIND-001', '通风巷风速传感器', 'WIND', 'MODBUS_RTU', '回风上山', 116.52, 39.83, 515.0, 10, 0, 15, 'm/s', 0.5, 0.3),
-('WIND-002', '进风巷风速传感器', 'WIND', 'CAN', '进风大巷', 116.46, 39.77, 540.0, 10, 0, 15, 'm/s', 0.5, 0.3);
+INSERT IGNORE INTO sensors (sensor_id, name, type, protocol, location, coordinates_x, coordinates_y, coordinates_z, sampling_interval, min_value, max_value, unit, warning_threshold, alarm_threshold, power_off_threshold) VALUES
+('GAS-001', '回风巷瓦斯传感器', 'GAS', 'MODBUS_RTU', '回风巷工作面A', 116.5, 39.8, 520.5, 1, 0, 4, '% CH4', 0.8, 1.0, 1.5),
+('GAS-002', '综采面瓦斯传感器', 'GAS', 'MODBUS_RTU', '综采工作面C', 116.51, 39.81, 518.3, 1, 0, 4, '% CH4', 0.8, 1.0, 1.5),
+('DUST-001', '掘进面粉尘传感器', 'DUST', 'MODBUS_RTU', '掘进工作面B', 116.49, 39.82, 525.1, 5, 0, 1000, 'mg/m³', 200, 500, 1000),
+('DUST-002', '运输巷粉尘传感器', 'DUST', 'MODBUS_TCP', '主运输大巷', 116.48, 39.79, 530.0, 5, 0, 1000, 'mg/m³', 200, 500, 1000),
+('CO-001', '主巷道CO传感器', 'CO', 'MODBUS_TCP', '主运输大巷', 116.48, 39.79, 530.0, 2, 0, 500, 'ppm', 24, 50, 100),
+('CO-002', '机电硐室CO传感器', 'CO', 'OPC_UA', '机电硐室', 116.47, 39.78, 535.5, 2, 0, 500, 'ppm', 24, 50, 100),
+('TEMP-001', '综采面温度传感器', 'TEMPERATURE', 'MODBUS_TCP', '综采工作面C', 116.51, 39.81, 518.3, 5, -5, 100, '℃', 26, 30, 35),
+('TEMP-002', '机电硐室温度传感器', 'TEMPERATURE', 'OPC_UA', '机电硐室', 116.47, 39.78, 535.5, 5, -5, 100, '℃', 30, 35, 40),
+('WIND-001', '通风巷风速传感器', 'WIND', 'MODBUS_RTU', '回风上山', 116.52, 39.83, 515.0, 10, 0, 15, 'm/s', 0.5, 0.3, 0.2),
+('WIND-002', '进风巷风速传感器', 'WIND', 'CAN', '进风大巷', 116.46, 39.77, 540.0, 10, 0, 15, 'm/s', 0.5, 0.3, 0.2);
 
 INSERT IGNORE INTO alert_rules (rule_name, sensor_type, condition_type, threshold_value, duration, level, enabled, notification_channels, description) VALUES
 ('瓦斯浓度预警', 'GAS', 'GTE', 0.8, 5, 'WARNING', 1, 'SMS,EMAIL,WEBHOOK', '瓦斯浓度超过0.8% CH4持续5秒触发预警'),
@@ -159,6 +160,43 @@ INSERT IGNORE INTO work_zones (zone_code, zone_name, zone_type, parent_zone_code
 ('ZONE-004', '回风巷', '回风巷', 'ZONE-001', 116.52, 39.83, 515.0, '回风巷道'),
 ('ZONE-005', '主运输大巷', '运输巷', 'ZONE-001', 116.48, 39.79, 530.0, '主运输巷道'),
 ('ZONE-006', '机电硐室', '机电硐室', 'ZONE-001', 116.47, 39.78, 535.5, '机电设备硐室');
+
+CREATE TABLE IF NOT EXISTS threshold_audit (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sensor_id VARCHAR(64) NOT NULL COMMENT '传感器ID',
+    threshold_type VARCHAR(32) NOT NULL COMMENT '阈值类型: WARNING, ALARM, POWER_OFF',
+    old_value DECIMAL(10,4) COMMENT '原值',
+    new_value DECIMAL(10,4) NOT NULL COMMENT '新值',
+    operator VARCHAR(64) NOT NULL COMMENT '操作人',
+    operation_type VARCHAR(32) NOT NULL COMMENT '操作类型: CREATE, UPDATE, APPROVE, REJECT',
+    approval_id BIGINT COMMENT '关联审批ID',
+    change_reason VARCHAR(512) COMMENT '变更原因',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_sensor_id (sensor_id),
+    INDEX idx_threshold_type (threshold_type),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='阈值变更审计表';
+
+CREATE TABLE IF NOT EXISTS threshold_approval (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    approval_no VARCHAR(64) NOT NULL UNIQUE COMMENT '审批编号',
+    sensor_id VARCHAR(64) NOT NULL COMMENT '传感器ID',
+    threshold_type VARCHAR(32) NOT NULL COMMENT '阈值类型: WARNING, ALARM, POWER_OFF',
+    old_value DECIMAL(10,4) COMMENT '原值',
+    new_value DECIMAL(10,4) NOT NULL COMMENT '新值',
+    applicant VARCHAR(64) NOT NULL COMMENT '申请人',
+    apply_reason VARCHAR(512) COMMENT '申请原因',
+    status TINYINT DEFAULT 0 COMMENT '状态: 0-待审批, 1-已通过, 2-已拒绝',
+    approver VARCHAR(64) COMMENT '审批人',
+    approve_comment VARCHAR(512) COMMENT '审批意见',
+    approved_at DATETIME COMMENT '审批时间',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_approval_no (approval_no),
+    INDEX idx_sensor_id (sensor_id),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='阈值调整审批表';
 
 INSERT IGNORE INTO system_config (config_key, config_value, config_type, description) VALUES
 ('mqtt.broker.url', 'tcp://localhost:1883', 'STRING', 'MQTT Broker地址'),

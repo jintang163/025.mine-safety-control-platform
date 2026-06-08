@@ -137,6 +137,7 @@ public class SensorService {
         sensor.setStatus(dto.getStatus() != null ? dto.getStatus() : 1);
         sensor.setWarningThreshold(dto.getWarningThreshold());
         sensor.setAlarmThreshold(dto.getAlarmThreshold());
+        sensor.setPowerOffThreshold(dto.getPowerOffThreshold());
 
         sensor = sensorRepository.save(sensor);
         return convertToDTO(sensor);
@@ -170,6 +171,7 @@ public class SensorService {
         if (dto.getStatus() != null) sensor.setStatus(dto.getStatus());
         if (dto.getWarningThreshold() != null) sensor.setWarningThreshold(dto.getWarningThreshold());
         if (dto.getAlarmThreshold() != null) sensor.setAlarmThreshold(dto.getAlarmThreshold());
+        if (dto.getPowerOffThreshold() != null) sensor.setPowerOffThreshold(dto.getPowerOffThreshold());
 
         sensor = sensorRepository.save(sensor);
         return convertToDTO(sensor);
@@ -337,6 +339,7 @@ public class SensorService {
         dto.setStatus(sensor.getStatus());
         dto.setWarningThreshold(sensor.getWarningThreshold());
         dto.setAlarmThreshold(sensor.getAlarmThreshold());
+        dto.setPowerOffThreshold(sensor.getPowerOffThreshold());
         dto.setLastOnlineTime(sensor.getLastOnlineTime() != null ?
                 sensor.getLastOnlineTime().toString() : null);
         return dto;

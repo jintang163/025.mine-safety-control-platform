@@ -22,6 +22,7 @@
         <influxdb.version>7.2.0</influxdb.version>
         <eclipse-paho.version>1.2.5</eclipse-paho.version>
         <commons-math3.version>3.6.1</commons-math3.version>
+        <netty.version>4.1.107.Final</netty.version>
     </properties>
 
     <dependencies>
@@ -96,6 +97,19 @@
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5</artifactId>
+        </dependency>
+
+        <!-- Netty WebSocket -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+            <version>${netty.version}</version>
+        </dependency>
+
+        <!-- Spring WebSocket -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
         <dependency>

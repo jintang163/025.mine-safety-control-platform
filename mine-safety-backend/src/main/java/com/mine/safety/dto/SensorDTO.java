@@ -111,6 +111,12 @@ public class SensorDTO {
     private BigDecimal alarmThreshold;
 
     /**
+     * 断电阈值
+     * 达到此值触发EMERGENCY级报警并执行断电
+     */
+    private BigDecimal powerOffThreshold;
+
+    /**
      * 当前值（仅用于返回前端展示）
      */
     private BigDecimal currentValue;

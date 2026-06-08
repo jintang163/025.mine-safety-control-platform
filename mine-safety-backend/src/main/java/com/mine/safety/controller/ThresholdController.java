@@ -1,0 +1,110 @@
+package com.mine.safety.controller;
+
+import com.mine.safety.dto.*;
+import com.mine.safety.service.RealtimeMonitorService;
+import com.mine.safety.service.ThresholdService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/thresholds")
+@RequiredArgsConstructor
+public class ThresholdController {
+
+    private final ThresholdService thresholdService;
+    private final RealtimeMonitorService realtimeMonitorService;
+
+    @GetMapping
+    public ApiResponse<List<ThresholdDTO>> getAllThresholds(
+            @RequestParam(required = false) String sensorType) {
+        List<ThresholdDTO> thresholds;
+        if (sensorType != null) {
+            thresholds = thresholdService.getThresholdsByType(sensorType);
+        } else {
+            thresholds = thresholdService.getAllThresholds();
+        }
+        return ApiResponse.success(thresholds);
+    }
+
+    @GetMapping("/{sensorId}")
+    public ApiResponse<ThresholdDTO> getThresholdBySensorId(@PathVariable String sensorId) {
+        return ApiResponse.success(thresholdService.getThresholdBySensorId(sensorId));
+    }
+
+    @GetMapping("/zone/{zoneCode}")
+    public ApiResponse<List<ThresholdDTO>> getThresholdsByZone(@PathVariable String zoneCode) {
+        return ApiResponse.success(thresholdService.getThresholdsByZone(zoneCode));
+    }
+
+    @GetMapping("/mine/summary")
+    public ApiResponse<Map<String, Object>> getMineLevelSummary() {
+        return ApiResponse.success(thresholdService.getMineLevelThresholdSummary());
+    }
+
+    @PostMapping("/apply")
+    public ApiResponse<ThresholdApprovalDTO> applyThresholdChange(
+            @Valid @RequestBody ThresholdApplyDTO dto) {
+        return ApiResponse.success(thresholdService.applyThresholdChange(dto));
+    }
+
+    @PostMapping("/approve")
+    public ApiResponse<ThresholdApprovalDTO> approveThreshold(
+            @Valid @RequestBody ApprovalActionDTO dto) {
+        return ApiResponse.success(thresholdService.approveThreshold(dto));
+    }
+
+    @GetMapping("/approvals")
+    public ApiResponse<Page<ThresholdApprovalDTO>> getApprovalList(
+            @RequestParam(required = false) Integer status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return ApiResponse.success(thresholdService.getApprovalList(status, pageable));
+    }
+
+    @GetMapping("/approvals/{approvalNo}")
+    public ApiResponse<ThresholdApprovalDTO> getApprovalDetail(@PathVariable String approvalNo) {
+        return ApiResponse.success(thresholdService.getApprovalDetail(approvalNo));
+    }
+
+    @GetMapping("/approvals/statistics")
+    public ApiResponse<Map<String, Object>> getApprovalStatistics() {
+        return ApiResponse.success(thresholdService.getApprovalStatistics());
+    }
+
+    @GetMapping("/audit")
+    public ApiResponse<Page<ThresholdAuditDTO>> getAuditList(
+            @RequestParam(required = false) String sensorId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return ApiResponse.success(thresholdService.getAuditList(sensorId, startTime, endTime, pageable));
+    }
+
+    @GetMapping("/monitor/channel/{sensorId}")
+    public ApiResponse<RealtimeMonitorDTO> getChannelMonitor(@PathVariable String sensorId) {
+        return ApiResponse.success(realtimeMonitorService.getChannelMonitor(sensorId));
+    }
+
+    @GetMapping("/monitor/zone/{zoneCode}")
+    public ApiResponse<RealtimeMonitorDTO.ZoneMonitorDTO> getZoneMonitor(@PathVariable String zoneCode) {
+        return ApiResponse.success(realtimeMonitorService.getZoneMonitor(zoneCode));
+    }
+
+    @GetMapping("/monitor/mine")
+    public ApiResponse<RealtimeMonitorDTO.MineMonitorDTO> getMineMonitor() {
+        return ApiResponse.success(realtimeMonitorService.getMineMonitor());
+    }
+}

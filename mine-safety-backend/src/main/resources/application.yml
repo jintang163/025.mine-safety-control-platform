@@ -121,6 +121,37 @@ app:
   alert:
     enabled: true
     cooldown-seconds: 30
+    sensor-threshold-check:
+      enabled: true
+  websocket:
+    enabled: true
+    endpoint: /ws
+    allowed-origins: "*"
+    realtime-push-interval: 5000
+  threshold:
+    defaults:
+      gas:
+        warning: 0.8
+        alarm: 1.0
+        power-off: 1.5
+      dust:
+        warning: 200
+        alarm: 500
+        power-off: 1000
+      co:
+        warning: 24
+        alarm: 50
+        power-off: 100
+      temperature:
+        warning: 26
+        alarm: 30
+        power-off: 35
+      wind:
+        warning: 0.5
+        alarm: 0.3
+        power-off: 0.2
+    approval-required: true
+    cache-expire-hours: 24
     notification:
       sms:
         enabled: false

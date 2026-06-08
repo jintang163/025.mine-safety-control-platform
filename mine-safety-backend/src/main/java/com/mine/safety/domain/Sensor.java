@@ -143,6 +143,13 @@ public class Sensor {
     private BigDecimal alarmThreshold;
 
     /**
+     * 断电阈值
+     * 达到此值触发EMERGENCY级报警并执行断电
+     */
+    @Column(name = "power_off_threshold", precision = 10, scale = 4)
+    private BigDecimal powerOffThreshold;
+
+    /**
      * 创建时间（自动生成）
      */
     @CreationTimestamp

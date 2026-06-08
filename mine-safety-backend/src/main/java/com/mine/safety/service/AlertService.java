@@ -77,6 +77,16 @@ public class AlertService {
     private final JavaMailSender mailSender;
 
     /**
+     * WebSocket推送服务
+     */
+    private final WebSocketPushService webSocketPushService;
+
+    /**
+     * 实时监测服务
+     */
+    private final RealtimeMonitorService realtimeMonitorService;
+
+    /**
      * HTTP客户端，用于Webhook和短信API调用
      */
     private final CloseableHttpClient httpClient = HttpClients.createDefault();
@@ -183,6 +193,9 @@ public class AlertService {
         String sensorType = dto.getSensorType();
         BigDecimal value = dto.getValue();
         LocalDateTime timestamp = dto.getTimestamp();
+
+        realtimeMonitorService.updateSensorData(dto);
+        webSocketPushService.pushSensorData(dto);
 
         // 查询匹配的报警规则（按传感器类型或指定传感器ID）
         List<AlertRule> rules = alertRuleRepository.findMatchingRules(sensorType, sensorId);
@@ -365,6 +378,9 @@ public class AlertService {
 
         // 发送报警事件到Kafka
         kafkaProducerService.sendAlertEvent(alertDTO);
+
+        // 通过WebSocket推送报警
+        webSocketPushService.pushAlert(alertDTO);
 
         // 异步处理多渠道通知
         processAlertNotification(alertDTO);
@@ -676,6 +692,85 @@ public class AlertService {
         dto.setLastAlertTime(alert.getLastAlertTime());
         dto.setAlertCount(alert.getAlertCount());
         return dto;
+    }
+
+    /**
+     * 基于传感器配置的三级阈值检测
+     * 与规则检测并行运行，直接使用传感器表中配置的预警、报警、断电阈值
+     *
+     * @param dto 传感器数据
+     */
+    @Transactional
+    public void checkSensorThresholds(SensorDataDTO dto) {
+        Sensor sensor = sensorRepository.findBySensorId(dto.getSensorId()).orElse(null);
+        if (sensor == null) return;
+
+        BigDecimal value = dto.getValue();
+        String alertLevel = null;
+        BigDecimal threshold = null;
+        String ruleName = null;
+        String description = null;
+
+        if (sensor.getPowerOffThreshold() != null && value.compareTo(sensor.getPowerOffThreshold()) >= 0) {
+            alertLevel = Alert.AlertLevel.EMERGENCY.name();
+            threshold = sensor.getPowerOffThreshold();
+            ruleName = sensor.getType() + "浓度断电";
+            description = String.format("%s浓度超过断电阈值%s%s，需立即断电！",
+                    getSensorTypeName(sensor.getType()), threshold, getUnitByType(sensor.getType()));
+        } else if (sensor.getAlarmThreshold() != null && value.compareTo(sensor.getAlarmThreshold()) >= 0) {
+            alertLevel = Alert.AlertLevel.ALERT.name();
+            threshold = sensor.getAlarmThreshold();
+            ruleName = sensor.getType() + "浓度报警";
+            description = String.format("%s浓度超过报警阈值%s%s，请及时处理！",
+                    getSensorTypeName(sensor.getType()), threshold, getUnitByType(sensor.getType()));
+        } else if (sensor.getWarningThreshold() != null && value.compareTo(sensor.getWarningThreshold()) >= 0) {
+            alertLevel = Alert.AlertLevel.WARNING.name();
+            threshold = sensor.getWarningThreshold();
+            ruleName = sensor.getType() + "浓度预警";
+            description = String.format("%s浓度超过预警阈值%s%s，请注意关注！",
+                    getSensorTypeName(sensor.getType()), threshold, getUnitByType(sensor.getType()));
+        }
+
+        if (alertLevel != null && checkCooldown(dto.getSensorId(), -1L)) {
+            Alert alert = new Alert();
+            alert.setAlertNo(generateAlertNo());
+            alert.setSensorId(dto.getSensorId());
+            alert.setSensorName(sensor.getName());
+            alert.setSensorType(sensor.getType());
+            alert.setLocation(dto.getLocation());
+            alert.setAlertValue(value);
+            alert.setThresholdValue(threshold);
+            alert.setLevel(alertLevel);
+            alert.setRuleName(ruleName);
+            alert.setDescription(description);
+            alert.setStatus(Alert.AlertStatus.PENDING.getValue());
+            alert.setFirstAlertTime(dto.getTimestamp());
+            alert.setLastAlertTime(dto.getTimestamp());
+            alert.setAlertCount(1);
+
+            alert = alertRepository.save(alert);
+
+            AlertDTO alertDTO = convertToDTO(alert);
+            alertDTO.setNotificationChannels("SMS,EMAIL,VOICE,WEBHOOK");
+
+            kafkaProducerService.sendAlertEvent(alertDTO);
+            webSocketPushService.pushAlert(alertDTO);
+            processAlertNotification(alertDTO);
+
+            log.warn("传感器阈值触发{} - 传感器: {}, 值: {}, 阈值: {}",
+                    alertLevel, dto.getSensorId(), value, threshold);
+        }
+    }
+
+    private String getSensorTypeName(String type) {
+        return switch (type) {
+            case "GAS" -> "瓦斯";
+            case "DUST" -> "粉尘";
+            case "CO" -> "一氧化碳";
+            case "TEMPERATURE" -> "温度";
+            case "WIND" -> "风速";
+            default -> type;
+        };
     }
 
     /**
