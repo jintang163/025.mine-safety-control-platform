@@ -8,15 +8,17 @@ const chartRef = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
 
 const onlineRate = computed(() => {
-  if (!props.data) return 92
-  const total = (props.data.online ?? 46) + (props.data.offline ?? 2) + (props.data.fault ?? 2)
-  return Math.round(((props.data.online ?? 46) / total) * 100)
+  if (!props.data) return 0
+  if (props.data.onlineRate != null) return props.data.onlineRate
+  const total = (props.data.onlineCount ?? 0) + (props.data.offlineCount ?? 0) + (props.data.faultCount ?? 0)
+  if (total === 0) return 0
+  return Math.round(((props.data.onlineCount ?? 0) / total) * 100)
 })
 
 const stats = computed(() => ({
-  online: props.data?.online ?? 46,
-  offline: props.data?.offline ?? 2,
-  fault: props.data?.fault ?? 2
+  online: props.data?.onlineCount ?? 0,
+  offline: props.data?.offlineCount ?? 0,
+  fault: props.data?.faultCount ?? 0
 }))
 
 function getOption() {

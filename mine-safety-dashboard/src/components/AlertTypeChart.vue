@@ -7,23 +7,24 @@ const props = defineProps<{ data: any }>()
 const chartRef = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
 
-const defaultData = [
-  { name: '瓦斯', value: 42 },
-  { name: '粉尘', value: 28 },
-  { name: 'CO', value: 35 },
-  { name: '温度', value: 18 },
-  { name: '风速', value: 12 }
-]
-
 const colors = ['#ff4757', '#ffb800', '#00d4ff', '#2ed573', '#a855f7']
 
+function mapItems(data: any) {
+  const raw = Array.isArray(data) ? data : (data?.items ?? [])
+  if (raw.length === 0) return []
+  return raw.map((d: any) => ({
+    name: d.type ?? d.sensorType ?? d.name ?? '未知',
+    value: d.count ?? d.value ?? 0
+  }))
+}
+
 const total = computed(() => {
-  const items = props.data?.items ?? defaultData
+  const items = mapItems(props.data)
   return items.reduce((s: number, d: any) => s + (d.value ?? 0), 0)
 })
 
 function getOption(data: any) {
-  const items = data?.items ?? defaultData
+  const items = mapItems(data)
 
   return {
     backgroundColor: 'transparent',

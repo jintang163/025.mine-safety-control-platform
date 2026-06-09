@@ -20,8 +20,16 @@ async function loadData() {
       fetchTunnelSensorHistory(props.tunnel),
       fetchTunnelAlertRecords(props.tunnel)
     ])
-    if (hist.status === 'fulfilled') historyData.value = hist.value
-    if (alerts.status === 'fulfilled') alertRecords.value = alerts.value ?? []
+    if (hist.status === 'fulfilled' && hist.value) {
+      historyData.value = transformHistoryData(hist.value)
+    } else {
+      historyData.value = generateMockHistory()
+    }
+    if (alerts.status === 'fulfilled' && alerts.value) {
+      alertRecords.value = alerts.value
+    } else {
+      alertRecords.value = generateMockAlerts()
+    }
   } catch {
     historyData.value = generateMockHistory()
     alertRecords.value = generateMockAlerts()
@@ -29,6 +37,35 @@ async function loadData() {
   loading.value = false
 }
 
+function transformHistoryData(raw: any) {
+  if (!raw) return generateMockHistory()
+  const list = Array.isArray(raw) ? raw : [raw]
+  if (list.length === 0) return generateMockHistory()
+  const times = list[0]?.timestamps?.[0] ?? Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
+  const series = list.map((s: any) => ({
+    name: s.sensorName ?? s.name ?? '传感器',
+    values: s.values ?? []
+  }))
+  return { times, series }
+}
+
+const ALERT_STATUS_MAP: Record<number, { label: string; cls: string }> = {
+  0: { label: '待处理', cls: 'pending' },
+  1: { label: '处理中', cls: 'pending' },
+  2: { label: '已派单', cls: 'pending' },
+  3: { label: '已到场', cls: 'pending' },
+  4: { label: '已确认', cls: 'confirmed' },
+  5: { label: '已关闭', cls: 'confirmed' }
+}
+
+function normalizeAlertStatus(status: any): { label: string; cls: string } {
+  if (typeof status === 'number') return ALERT_STATUS_MAP[status] ?? { label: '未知', cls: 'pending' }
+  if (status === 'confirmed') return { label: '已确认', cls: 'confirmed' }
+  if (status === 'pending') return { label: '待处理', cls: 'pending' }
+  return { label: String(status ?? '未知'), cls: 'pending' }
+}
+
+// MOCK FALLBACK - 仅在API完全失败时使用
 function generateMockHistory() {
   const times = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
   return {
@@ -41,6 +78,7 @@ function generateMockHistory() {
   }
 }
 
+// MOCK FALLBACK - 仅在API完全失败时使用
 function generateMockAlerts() {
   const types = ['瓦斯超限', 'CO超限', '粉尘超标', '温度异常']
   const statuses = ['confirmed', 'pending', 'pending']
@@ -146,13 +184,13 @@ onUnmounted(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="r in alertRecords" :key="r.id">
-                  <td class="number-display">{{ r.time }}</td>
-                  <td>{{ r.type }}</td>
-                  <td class="number-display">{{ r.value }}</td>
+                <tr v-for="(r, idx) in alertRecords" :key="r.alertNo ?? r.id ?? idx">
+                  <td class="number-display">{{ r.createdAt ?? r.time }}</td>
+                  <td>{{ r.sensorName ?? r.type }}</td>
+                  <td class="number-display">{{ r.alertValue ?? r.value }}</td>
                   <td>
-                    <span class="status-badge" :class="r.status">
-                      {{ r.status === 'confirmed' ? '已确认' : '未确认' }}
+                    <span class="status-badge" :class="normalizeAlertStatus(r.status).cls">
+                      {{ normalizeAlertStatus(r.status).label }}
                     </span>
                   </td>
                 </tr>

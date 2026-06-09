@@ -7,10 +7,11 @@ const props = defineProps<{ data: any }>()
 const chartRef = ref<HTMLDivElement>()
 let chart: echarts.ECharts | null = null
 
-const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
+const defaultHours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
 
 function getOption(data: any) {
-  const values = data?.values ?? Array(24).fill(0).map(() => Math.floor(Math.random() * 15))
+  const hours = data?.hours ?? defaultHours
+  const values = data?.counts ?? Array(24).fill(0)
 
   return {
     backgroundColor: 'transparent',

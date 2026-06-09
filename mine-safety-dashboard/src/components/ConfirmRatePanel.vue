@@ -8,6 +8,7 @@ const confirmed = ref(0)
 const unconfirmed = ref(0)
 
 const confirmRate = computed(() => {
+  if (props.overview?.confirmRate != null) return props.overview.confirmRate
   if (todayAlerts.value === 0) return 0
   return Math.round((confirmed.value / todayAlerts.value) * 100)
 })
@@ -21,14 +22,14 @@ const barColor = computed(() => {
 
 function updateFromOverview(ov: any) {
   if (!ov) {
-    todayAlerts.value = 156
-    confirmed.value = 138
-    unconfirmed.value = 18
+    todayAlerts.value = 0
+    confirmed.value = 0
+    unconfirmed.value = 0
     return
   }
-  todayAlerts.value = ov.todayAlerts ?? 0
-  confirmed.value = ov.confirmedAlerts ?? 0
-  unconfirmed.value = ov.unconfirmedAlerts ?? 0
+  todayAlerts.value = ov.todayAlertTotal ?? 0
+  confirmed.value = ov.todayAlertConfirmed ?? 0
+  unconfirmed.value = (ov.todayAlertTotal ?? 0) - (ov.todayAlertConfirmed ?? 0)
 }
 
 watch(() => props.overview, updateFromOverview, { immediate: true })

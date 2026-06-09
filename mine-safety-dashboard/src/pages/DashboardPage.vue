@@ -14,6 +14,10 @@ const {
   alertTypeDistribution,
   deviceStatus,
   alertData,
+  sensors,
+  personnelDistribution,
+  heatmap,
+  sensorData,
   connected
 } = useDashboard()
 
@@ -31,9 +35,9 @@ const datetime = computed(() => {
 const deviceSummary = computed(() => {
   if (!overview.value) return { online: 0, offline: 0, fault: 0 }
   return {
-    online: overview.value.onlineDevices ?? 0,
-    offline: overview.value.offlineDevices ?? 0,
-    fault: overview.value.faultDevices ?? 0
+    online: overview.value.sensorOnline ?? 0,
+    offline: overview.value.sensorOffline ?? 0,
+    fault: overview.value.sensorFault ?? 0
   }
 })
 
@@ -43,7 +47,13 @@ const tickerAlerts = computed(() => {
   }
   return alertData.value
     .slice(0, 10)
-    .map((a: any) => `[${a.time ?? '--:--'}] ${a.tunnel ?? '未知巷道'} - ${a.type ?? '报警'}: ${a.message ?? ''}`)
+    .map((a: any) => {
+      const time = a.firstAlertTime ?? a.createdAt ?? a.time ?? '--:--'
+      const sensor = a.sensorName ?? a.tunnel ?? '未知传感器'
+      const level = a.level ?? a.type ?? '报警'
+      const value = a.alertValue ?? a.message ?? ''
+      return `[${time}] ${sensor} - ${level}: ${value}`
+    })
     .join('    ///    ')
 })
 
@@ -93,7 +103,7 @@ function closeDrilldown() {
     </aside>
 
     <main class="map-container">
-      <MineMap @select-tunnel="onSelectTunnel" />
+      <MineMap :sensors="sensors" :personnel="personnelDistribution" :heatmap-data="heatmap" :ws-sensor-data="sensorData" @select-tunnel="onSelectTunnel" />
     </main>
 
     <aside class="panel-right">

@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+
+const props = defineProps<{
+  sensors: any[]
+  personnel: any[]
+  heatmapData: any[]
+  wsSensorData: Map<string, any>
+}>()
 
 const emit = defineEmits<{
   (e: 'select-tunnel', tunnel: string): void
@@ -9,7 +16,7 @@ const canvasRef = ref<HTMLCanvasElement>()
 let animFrame = 0
 let ctx: CanvasRenderingContext2D | null = null
 
-interface Tunnel {
+interface TunnelDef {
   name: string
   x1: number; y1: number
   x2: number; y2: number
@@ -17,23 +24,7 @@ interface Tunnel {
   color: string
 }
 
-interface Sensor {
-  x: number; y: number
-  value: number
-  label: string
-  unit: string
-  level: 'normal' | 'warning' | 'danger'
-  tunnel: string
-}
-
-interface Zone {
-  x: number; y: number
-  name: string
-  personnel: number
-  tunnel: string
-}
-
-const tunnels: Tunnel[] = [
+const tunnelDefs: TunnelDef[] = [
   { name: '运输巷', x1: 60, y1: 280, x2: 320, y2: 280, width: 50, color: 'rgba(0,212,255,0.15)' },
   { name: '回风巷', x1: 60, y1: 120, x2: 320, y2: 120, width: 50, color: 'rgba(0,212,255,0.15)' },
   { name: '中央变电所', x1: 320, y1: 120, x2: 320, y2: 280, width: 50, color: 'rgba(168,85,247,0.15)' },
@@ -41,24 +32,96 @@ const tunnels: Tunnel[] = [
   { name: '采煤工作面', x1: 320, y1: 280, x2: 620, y2: 280, width: 50, color: 'rgba(255,71,87,0.15)' }
 ]
 
-const sensors: Sensor[] = [
-  { x: 150, y: 100, value: 0.32, label: 'CH₄', unit: '%', level: 'normal', tunnel: '回风巷' },
-  { x: 400, y: 100, value: 0.68, label: 'CH₄', unit: '%', level: 'warning', tunnel: '掘进工作面' },
-  { x: 550, y: 100, value: 0.95, label: 'CO', unit: 'ppm', level: 'danger', tunnel: '掘进工作面' },
-  { x: 150, y: 260, value: 1.2, label: '粉尘', unit: 'mg/m³', level: 'warning', tunnel: '运输巷' },
-  { x: 400, y: 260, value: 0.25, label: 'CH₄', unit: '%', level: 'normal', tunnel: '采煤工作面' },
-  { x: 550, y: 260, value: 0.88, label: 'CH₄', unit: '%', level: 'danger', tunnel: '采煤工作面' },
-  { x: 300, y: 200, value: 24.5, label: '温度', unit: '°C', level: 'normal', tunnel: '中央变电所' },
-  { x: 340, y: 200, value: 1.8, label: '风速', unit: 'm/s', level: 'normal', tunnel: '中央变电所' }
+const tunnelCenterMap: Record<string, { cx: number; cy: number }> = {}
+tunnelDefs.forEach(t => {
+  tunnelCenterMap[t.name] = { cx: (t.x1 + t.x2) / 2, cy: (t.y1 + t.y2) / 2 }
+})
+
+const defaultTunnelCenters = [
+  { tunnel: '回风巷', cx: 180, cy: 120 },
+  { tunnel: '运输巷', cx: 180, cy: 280 },
+  { tunnel: '中央变电所', cx: 320, cy: 200 },
+  { tunnel: '掘进工作面', cx: 470, cy: 120 },
+  { tunnel: '采煤工作面', cx: 470, cy: 280 }
 ]
 
-const zones: Zone[] = [
-  { x: 180, y: 120, name: '回风巷', personnel: 5, tunnel: '回风巷' },
-  { x: 180, y: 280, name: '运输巷', personnel: 8, tunnel: '运输巷' },
-  { x: 320, y: 200, name: '中央变电所', personnel: 2, tunnel: '中央变电所' },
-  { x: 470, y: 120, name: '掘进面', personnel: 12, tunnel: '掘进工作面' },
-  { x: 470, y: 280, name: '采煤面', personnel: 15, tunnel: '采煤工作面' }
-]
+function getSensorPosition(sensor: any, index: number): { x: number; y: number } {
+  if (sensor.coordinatesX != null && sensor.coordinatesY != null) {
+    return { x: sensor.coordinatesX, y: sensor.coordinatesY }
+  }
+  const tunnel = sensor.tunnel || sensor.location || ''
+  const center = tunnelCenterMap[tunnel]
+  if (center) {
+    const offsetX = ((index % 3) - 1) * 60
+    const offsetY = ((Math.floor(index / 3) % 2) - 0.5) * 20
+    return { x: center.cx + offsetX, y: center.cy + offsetY }
+  }
+  return { x: 100 + index * 70, y: 200 }
+}
+
+function getSensorLevel(sensor: any): 'normal' | 'warning' | 'danger' {
+  const status = sensor.status
+  if (status === 2 || status === 'danger') return 'danger'
+  if (status === 1 || status === 'warning') return 'warning'
+  return 'normal'
+}
+
+function getSensorLabel(sensor: any): string {
+  const type = sensor.sensorType || ''
+  if (type.includes('GAS') || type.includes('瓦斯') || type.includes('CH')) return 'CH₄'
+  if (type.includes('DUST') || type.includes('粉尘')) return '粉尘'
+  if (type.includes('CO')) return 'CO'
+  if (type.includes('TEMP') || type.includes('温度')) return '温度'
+  if (type.includes('WIND') || type.includes('风速')) return '风速'
+  return type || '传感器'
+}
+
+function getSensorUnit(sensor: any): string {
+  const type = sensor.sensorType || ''
+  if (type.includes('GAS') || type.includes('瓦斯') || type.includes('CH')) return '%'
+  if (type.includes('DUST') || type.includes('粉尘')) return 'mg/m³'
+  if (type.includes('CO')) return 'ppm'
+  if (type.includes('TEMP') || type.includes('温度')) return '°C'
+  if (type.includes('WIND') || type.includes('风速')) return 'm/s'
+  return sensor.unit || ''
+}
+
+const mergedSensors = computed(() => {
+  const list = props.sensors || []
+  return list.map((s, i) => {
+    const pos = getSensorPosition(s, i)
+    const wsData = props.wsSensorData?.get(s.sensorId)
+    const value = wsData?.value ?? s.currentValue ?? 0
+    return {
+      x: pos.x,
+      y: pos.y,
+      value,
+      label: getSensorLabel(s),
+      unit: getSensorUnit(s),
+      level: getSensorLevel(wsData ? { ...s, currentValue: value, status: wsData.status ?? s.status } : s),
+      tunnel: s.tunnel || s.location || '',
+      sensorId: s.sensorId,
+      sensorName: s.sensorName || s.name || ''
+    }
+  })
+})
+
+const mergedPersonnel = computed(() => {
+  const list = props.personnel || []
+  if (list.length === 0) return []
+  return list.map(p => {
+    const match = defaultTunnelCenters.find(c => c.tunnel === p.zoneName || c.tunnel === (p.zoneCode || ''))
+    const cx = p.coordinatesX ?? match?.cx ?? 200
+    const cy = p.coordinatesY ?? match?.cy ?? 200
+    return {
+      x: cx,
+      y: cy,
+      name: p.zoneName || p.zoneCode || '',
+      personnel: p.count ?? 0,
+      tunnel: p.zoneName || p.zoneCode || ''
+    }
+  })
+})
 
 let tick = 0
 
@@ -68,7 +131,7 @@ function getLevelColor(level: string, alpha = 1) {
   return `rgba(46,213,115,${alpha})`
 }
 
-function drawTunnel(t: Tunnel) {
+function drawTunnel(t: TunnelDef) {
   if (!ctx) return
   const isVertical = t.x1 === t.x2
   ctx.save()
@@ -106,7 +169,7 @@ function drawTunnel(t: Tunnel) {
   ctx.restore()
 }
 
-function drawSensor(s: Sensor) {
+function drawSensor(s: any) {
   if (!ctx) return
   ctx.save()
 
@@ -142,7 +205,7 @@ function drawSensor(s: Sensor) {
   ctx.restore()
 }
 
-function drawZone(z: Zone) {
+function drawZone(z: any) {
   if (!ctx) return
   ctx.save()
 
@@ -170,17 +233,41 @@ function drawZone(z: Zone) {
 
 function drawDustFlicker() {
   if (!ctx) return
-  const dustSensor = sensors.find(s => s.label === '粉尘' && s.level === 'warning')
-  if (!dustSensor) return
+  const dustSensors = mergedSensors.value.filter(s => s.level === 'warning' || s.level === 'danger')
+  if (dustSensors.length === 0) return
 
   const alpha = Math.sin(tick * 0.08) * 0.08 + 0.08
-  ctx.save()
-  const gradient = ctx.createRadialGradient(dustSensor.x, dustSensor.y, 10, dustSensor.x, dustSensor.y, 60)
-  gradient.addColorStop(0, `rgba(255,184,0,${alpha})`)
-  gradient.addColorStop(1, 'rgba(255,184,0,0)')
-  ctx.fillStyle = gradient
-  ctx.fillRect(dustSensor.x - 60, dustSensor.y - 60, 120, 120)
-  ctx.restore()
+  dustSensors.forEach(s => {
+    ctx.save()
+    const gradient = ctx.createRadialGradient(s.x, s.y, 10, s.x, s.y, 60)
+    const color = s.level === 'danger' ? '255,71,87' : '255,184,0'
+    gradient.addColorStop(0, `rgba(${color},${alpha})`)
+    gradient.addColorStop(1, `rgba(${color},0)`)
+    ctx.fillStyle = gradient
+    ctx.fillRect(s.x - 60, s.y - 60, 120, 120)
+    ctx.restore()
+  })
+}
+
+function drawHeatmap() {
+  if (!ctx) return
+  const data = props.heatmapData || []
+  if (data.length === 0) return
+
+  data.forEach(p => {
+    const x = p.coordinatesX ?? 0
+    const y = p.coordinatesY ?? 0
+    const val = p.value ?? 0
+    const alpha = Math.min(val / 1.5, 0.35)
+    ctx.save()
+    const gradient = ctx.createRadialGradient(x, y, 5, x, y, 50)
+    gradient.addColorStop(0, `rgba(255,71,87,${alpha})`)
+    gradient.addColorStop(0.5, `rgba(255,184,0,${alpha * 0.5})`)
+    gradient.addColorStop(1, 'rgba(255,184,0,0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(x - 50, y - 50, 100, 100)
+    ctx.restore()
+  })
 }
 
 function draw() {
@@ -189,10 +276,11 @@ function draw() {
   const h = canvasRef.value.height
   ctx.clearRect(0, 0, w, h)
 
-  tunnels.forEach(drawTunnel)
+  tunnelDefs.forEach(drawTunnel)
+  drawHeatmap()
   drawDustFlicker()
-  sensors.forEach(drawSensor)
-  zones.forEach(drawZone)
+  mergedSensors.value.forEach(drawSensor)
+  mergedPersonnel.value.forEach(drawZone)
 
   ctx.font = '11px "Noto Sans SC"'
   ctx.fillStyle = 'rgba(232,240,254,0.3)'
@@ -209,11 +297,19 @@ function handleClick(e: MouseEvent) {
   const x = e.clientX - rect.left
   const y = e.clientY - rect.top
 
-  for (const z of zones) {
+  for (const z of mergedPersonnel.value) {
     const dx = x - z.x
     const dy = y - (z.y + 50)
     if (dx * dx + dy * dy < 400) {
       emit('select-tunnel', z.tunnel)
+      return
+    }
+  }
+  for (const s of mergedSensors.value) {
+    const dx = x - s.x
+    const dy = y - s.y
+    if (dx * dx + dy * dy < 200) {
+      emit('select-tunnel', s.tunnel)
       return
     }
   }
