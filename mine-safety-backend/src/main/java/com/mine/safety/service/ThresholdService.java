@@ -1,5 +1,9 @@
 package com.mine.safety.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.metadata.OrderItem;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.domain.ThresholdApproval;
 import com.mine.safety.domain.ThresholdAudit;
@@ -10,8 +14,6 @@ import com.mine.safety.repository.ThresholdAuditRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,13 +40,13 @@ public class ThresholdService {
     }
 
     public List<ThresholdDTO> getAllThresholds() {
-        return sensorRepository.findAll().stream()
+        return sensorRepository.selectList(null).stream()
                 .map(this::convertToThresholdDTO)
                 .collect(Collectors.toList());
     }
 
     public List<ThresholdDTO> getThresholdsByType(String sensorType) {
-        return sensorRepository.findByType(sensorType).stream()
+        return sensorRepository.selectList(new LambdaQueryWrapper<Sensor>().eq(Sensor::getType, sensorType)).stream()
                 .map(this::convertToThresholdDTO)
                 .collect(Collectors.toList());
     }
@@ -58,13 +60,13 @@ public class ThresholdService {
     }
 
     public List<ThresholdDTO> getThresholdsByZone(String zoneCode) {
-        return sensorRepository.findByZoneCode(zoneCode).stream()
+        return sensorRepository.selectList(new LambdaQueryWrapper<Sensor>().eq(Sensor::getZoneCode, zoneCode)).stream()
                 .map(this::convertToThresholdDTO)
                 .collect(Collectors.toList());
     }
 
     public Map<String, Object> getMineLevelThresholdSummary() {
-        List<Sensor> sensors = sensorRepository.findAll();
+        List<Sensor> sensors = sensorRepository.selectList(null);
         Map<String, Object> summary = new HashMap<>();
         summary.put("totalSensors", sensors.size());
         summary.put("gasSensors", sensors.stream().filter(s -> "GAS".equals(s.getType())).count());
@@ -87,14 +89,19 @@ public class ThresholdService {
 
     @Transactional
     public ThresholdApprovalDTO applyThresholdChange(ThresholdApplyDTO dto) {
-        Sensor sensor = sensorRepository.findBySensorId(dto.getSensorId())
-                .orElseThrow(() -> new RuntimeException("传感器不存在: " + dto.getSensorId()));
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, dto.getSensorId()));
+        if (sensor == null) {
+            throw new RuntimeException("传感器不存在: " + dto.getSensorId());
+        }
 
         validateThresholdType(dto.getThresholdType());
         validateThresholdValue(dto.getThresholdType(), dto.getNewValue(), sensor.getType());
 
-        List<ThresholdApproval> pending = thresholdApprovalRepository.findPendingBySensorId(
-                dto.getSensorId(), ThresholdApproval.ApprovalStatus.PENDING.getValue());
+        List<ThresholdApproval> pending = thresholdApprovalRepository.selectList(
+                new LambdaQueryWrapper<ThresholdApproval>()
+                        .eq(ThresholdApproval::getSensorId, dto.getSensorId())
+                        .eq(ThresholdApproval::getStatus, ThresholdApproval.ApprovalStatus.PENDING.getValue()));
         if (!pending.isEmpty()) {
             throw new RuntimeException("该传感器已有待审批的阈值调整申请");
         }
@@ -111,7 +118,7 @@ public class ThresholdService {
         approval.setApplyReason(dto.getApplyReason());
         approval.setStatus(ThresholdApproval.ApprovalStatus.PENDING.getValue());
 
-        approval = thresholdApprovalRepository.save(approval);
+        approval = thresholdApprovalRepository.insert(approval);
 
         recordAudit(dto.getSensorId(), dto.getThresholdType(), oldValue, dto.getNewValue(),
                 dto.getApplicant(), ThresholdAudit.OperationType.CREATE.name(),
@@ -126,19 +133,25 @@ public class ThresholdService {
 
     @Transactional
     public ThresholdApprovalDTO approveThreshold(ApprovalActionDTO dto) {
-        ThresholdApproval approval = thresholdApprovalRepository.findByApprovalNo(dto.getApprovalNo())
-                .orElseThrow(() -> new RuntimeException("审批记录不存在: " + dto.getApprovalNo()));
+        ThresholdApproval approval = thresholdApprovalRepository.selectOne(
+                new LambdaQueryWrapper<ThresholdApproval>().eq(ThresholdApproval::getApprovalNo, dto.getApprovalNo()));
+        if (approval == null) {
+            throw new RuntimeException("审批记录不存在: " + dto.getApprovalNo());
+        }
 
         if (!ThresholdApproval.ApprovalStatus.PENDING.getValue().equals(approval.getStatus())) {
             throw new RuntimeException("该申请已处理，无法重复审批");
         }
 
-        Sensor sensor = sensorRepository.findBySensorId(approval.getSensorId())
-                .orElseThrow(() -> new RuntimeException("传感器不存在: " + approval.getSensorId()));
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, approval.getSensorId()));
+        if (sensor == null) {
+            throw new RuntimeException("传感器不存在: " + approval.getSensorId());
+        }
 
         if (dto.getResult().equals(ThresholdApproval.ApprovalStatus.APPROVED.getValue())) {
             updateSensorThreshold(sensor, approval.getThresholdType(), approval.getNewValue());
-            sensorRepository.save(sensor);
+            sensorRepository.updateById(sensor);
 
             /**
              * 缓存刷新策略（审批通过后）：
@@ -182,56 +195,60 @@ public class ThresholdService {
         approval.setApprover(dto.getApprover());
         approval.setApproveComment(dto.getApproveComment());
         approval.setApprovedAt(LocalDateTime.now());
-        approval = thresholdApprovalRepository.save(approval);
+        approval = thresholdApprovalRepository.updateById(approval);
 
         return convertToApprovalDTO(approval, sensor);
     }
 
-    public Page<ThresholdApprovalDTO> getApprovalList(Integer status, Pageable pageable) {
-        Page<ThresholdApproval> page;
+    public IPage<ThresholdApprovalDTO> getApprovalList(Integer status, int pageNum, int pageSize) {
+        Page<ThresholdApproval> page = new Page<>(pageNum + 1, pageSize);
+        page.addOrder(OrderItem.desc("created_at"));
+        LambdaQueryWrapper<ThresholdApproval> wrapper = new LambdaQueryWrapper<>();
         if (status != null) {
-            page = thresholdApprovalRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
-        } else {
-            page = thresholdApprovalRepository.findAll(pageable);
+            wrapper.eq(ThresholdApproval::getStatus, status);
         }
-        return page.map(approval -> {
-            Sensor sensor = sensorRepository.findBySensorId(approval.getSensorId()).orElse(null);
+        page = thresholdApprovalRepository.selectPage(page, wrapper);
+
+        Page<ThresholdApprovalDTO> resultPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        resultPage.setRecords(page.getRecords().stream().map(approval -> {
+            Sensor sensor = sensorRepository.selectOne(
+                    new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, approval.getSensorId()));
             return convertToApprovalDTO(approval, sensor);
-        });
+        }).collect(Collectors.toList()));
+        return resultPage;
     }
 
     public ThresholdApprovalDTO getApprovalDetail(String approvalNo) {
-        ThresholdApproval approval = thresholdApprovalRepository.findByApprovalNo(approvalNo)
-                .orElseThrow(() -> new RuntimeException("审批记录不存在: " + approvalNo));
-        Sensor sensor = sensorRepository.findBySensorId(approval.getSensorId()).orElse(null);
+        ThresholdApproval approval = thresholdApprovalRepository.selectOne(
+                new LambdaQueryWrapper<ThresholdApproval>().eq(ThresholdApproval::getApprovalNo, approvalNo));
+        if (approval == null) {
+            throw new RuntimeException("审批记录不存在: " + approvalNo);
+        }
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, approval.getSensorId()));
         return convertToApprovalDTO(approval, sensor);
     }
 
-    public Page<ThresholdAuditDTO> getAuditList(String sensorId, LocalDateTime startTime,
-                                                 LocalDateTime endTime, Pageable pageable) {
-        List<ThresholdAudit> audits;
+    public IPage<ThresholdAuditDTO> getAuditList(String sensorId, LocalDateTime startTime,
+                                                 LocalDateTime endTime, int pageNum, int pageSize) {
+        Page<ThresholdAudit> page = new Page<>(pageNum + 1, pageSize);
+        LambdaQueryWrapper<ThresholdAudit> wrapper = new LambdaQueryWrapper<>();
+
         if (sensorId != null) {
-            if (startTime != null && endTime != null) {
-                audits = thresholdAuditRepository.findBySensorIdAndTimeRange(sensorId, startTime, endTime);
-            } else {
-                audits = thresholdAuditRepository.findBySensorIdOrderByCreatedAtDesc(sensorId);
-            }
-        } else if (startTime != null && endTime != null) {
-            audits = thresholdAuditRepository.findByTimeRange(startTime, endTime);
-        } else {
-            audits = thresholdAuditRepository.findAll();
+            wrapper.eq(ThresholdAudit::getSensorId, sensorId);
         }
-        audits.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        if (startTime != null && endTime != null) {
+            wrapper.between(ThresholdAudit::getCreatedAt, startTime, endTime);
+        }
+        wrapper.orderByDesc(ThresholdAudit::getCreatedAt);
 
-        List<ThresholdAuditDTO> dtos = audits.stream()
+        page = thresholdAuditRepository.selectPage(page, wrapper);
+
+        Page<ThresholdAuditDTO> resultPage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        resultPage.setRecords(page.getRecords().stream()
                 .map(this::convertToAuditDTO)
-                .collect(Collectors.toList());
-
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), dtos.size());
-        List<ThresholdAuditDTO> pageContent = start < dtos.size() ? dtos.subList(start, end) : Collections.emptyList();
-
-        return new org.springframework.data.domain.PageImpl<>(pageContent, pageable, dtos.size());
+                .collect(Collectors.toList()));
+        return resultPage;
     }
 
     public Map<String, Object> getApprovalStatistics() {
@@ -273,7 +290,7 @@ public class ThresholdService {
         audit.setOperationType(operationType);
         audit.setApprovalId(approvalId);
         audit.setChangeReason(reason);
-        thresholdAuditRepository.save(audit);
+        thresholdAuditRepository.insert(audit);
     }
 
     private void validateThresholdType(String type) {
@@ -358,8 +375,11 @@ public class ThresholdService {
         dto.setChangeReason(audit.getChangeReason());
         dto.setCreatedAt(audit.getCreatedAt());
 
-        sensorRepository.findBySensorId(audit.getSensorId()).ifPresent(s ->
-                dto.setSensorName(s.getName()));
+        Sensor s = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, audit.getSensorId()));
+        if (s != null) {
+            dto.setSensorName(s.getName());
+        }
         return dto;
     }
 

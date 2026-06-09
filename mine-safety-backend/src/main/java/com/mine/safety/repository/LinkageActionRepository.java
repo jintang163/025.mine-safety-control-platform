@@ -1,34 +1,19 @@
 package com.mine.safety.repository;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.mine.safety.domain.LinkageAction;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
-import java.util.Optional;
 
-@Repository
-public interface LinkageActionRepository extends JpaRepository<LinkageAction, Long> {
+@Mapper
+public interface LinkageActionRepository extends BaseMapper<LinkageAction> {
 
-    Optional<LinkageAction> findByActionCode(String actionCode);
-
-    List<LinkageAction> findByEnabled(Boolean enabled);
-
-    List<LinkageAction> findByActionTypeAndEnabled(String actionType, Boolean enabled);
-
-    List<LinkageAction> findByTargetTypeAndTargetCodeAndEnabled(String targetType, String targetCode, Boolean enabled);
-
-    @Query("SELECT a FROM LinkageAction a JOIN RuleActionRelation r ON a.id = r.actionId " +
-           "WHERE r.ruleId = :ruleId AND a.enabled = true " +
-           "ORDER BY r.executionOrder ASC")
+    @Select("SELECT a.* FROM linkage_actions a JOIN alert_rule_action_relations r ON a.id = r.action_id WHERE r.rule_id = #{ruleId} AND a.enabled = true ORDER BY r.execution_order ASC")
     List<LinkageAction> findActionsByRuleId(@Param("ruleId") Long ruleId);
 
-    @Query("SELECT a FROM LinkageAction a JOIN RuleActionRelation r ON a.id = r.actionId " +
-           "WHERE r.ruleCode = :ruleCode AND a.enabled = true " +
-           "ORDER BY r.executionOrder ASC")
+    @Select("SELECT a.* FROM linkage_actions a JOIN alert_rule_action_relations r ON a.id = r.action_id WHERE r.rule_code = #{ruleCode} AND a.enabled = true ORDER BY r.execution_order ASC")
     List<LinkageAction> findActionsByRuleCode(@Param("ruleCode") String ruleCode);
-
-    boolean existsByActionCode(String actionCode);
 }

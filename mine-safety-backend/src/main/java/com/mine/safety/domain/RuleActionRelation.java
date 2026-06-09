@@ -1,6 +1,10 @@
 package com.mine.safety.domain;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -12,47 +16,33 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "alert_rule_action_relations",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"rule_id", "action_id"}))
+@TableName("alert_rule_action_relations")
 public class RuleActionRelation {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "rule_id", nullable = false)
+    @TableField("rule_id")
     private Long ruleId;
 
-    @Column(name = "rule_code", length = 64, nullable = false)
+    @TableField("rule_code")
     private String ruleCode;
 
-    @Column(name = "action_id", nullable = false)
+    @TableField("action_id")
     private Long actionId;
 
-    @Column(name = "action_code", length = 64, nullable = false)
+    @TableField("action_code")
     private String actionCode;
 
-    @Column(name = "execution_order")
-    private Integer executionOrder;
+    @TableField("execution_order")
+    private Integer executionOrder = 0;
 
-    @Column(name = "delay_seconds")
-    private Integer delaySeconds;
+    @TableField("delay_seconds")
+    private Integer delaySeconds = 0;
 
-    @Column(name = "condition_expression", length = 512)
+    @TableField("condition_expression")
     private String conditionExpression;
 
-    @Column(name = "created_at")
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        if (executionOrder == null) {
-            executionOrder = 0;
-        }
-        if (delaySeconds == null) {
-            delaySeconds = 0;
-        }
-    }
 }

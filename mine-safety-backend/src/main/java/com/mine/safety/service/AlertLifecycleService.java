@@ -1,5 +1,9 @@
 package com.mine.safety.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.metadata.OrderItem;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mine.safety.domain.Alert;
 import com.mine.safety.domain.Alert.AlertStatus;
 import com.mine.safety.domain.Alert.EscalationLevel;
@@ -13,10 +17,6 @@ import com.mine.safety.repository.AlertRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,7 +74,7 @@ public class AlertLifecycleService {
         alert.setLastAlertTime(LocalDateTime.now());
         alert.setAlertCount(1);
 
-        alert = alertRepository.save(alert);
+        alertRepository.insert(alert);
 
         addToUnconfirmedQueue(alert.getAlertNo(), alert.getLevel());
 
@@ -89,17 +89,19 @@ public class AlertLifecycleService {
 
     @Transactional
     public Alert confirmAlert(String alertNo, String confirmedBy) {
-        Alert alert = alertRepository.findByAlertNo(alertNo)
-                .orElseThrow(() -> new RuntimeException("报警不存在: " + alertNo));
+        Alert alert = alertRepository.selectOne(new LambdaQueryWrapper<Alert>().eq(Alert::getAlertNo, alertNo));
+        if (alert == null) {
+            throw new RuntimeException("报警不存在: " + alertNo);
+        }
 
         if (alert.getStatus() != AlertStatus.PENDING.getValue()) {
-            throw new RuntimeException("报警状态不是触发状态，无法确认");
+            throw new RuntimeException("报警状态不是触发状态，无法确认。当前状态: " + alert.getStatus() + "，要求状态: PENDING(0)");
         }
 
         alert.setStatus(AlertStatus.CONFIRMED.getValue());
         alert.setConfirmedBy(confirmedBy);
         alert.setConfirmedAt(LocalDateTime.now());
-        alert = alertRepository.save(alert);
+        alertRepository.updateById(alert);
 
         removeFromUnconfirmedQueue(alertNo);
 
@@ -109,7 +111,7 @@ public class AlertLifecycleService {
         record.setDisposalMeasures("值班人员确认报警");
         record.setOperator(confirmedBy);
         record.setOperatorRole("DUTY");
-        disposalRecordRepository.save(record);
+        disposalRecordRepository.insert(record);
 
         AlertDTO dto = convertToDTO(alert);
         webSocketPushService.pushAlert(dto);
@@ -120,24 +122,26 @@ public class AlertLifecycleService {
 
     @Transactional
     public Alert startProcessing(String alertNo, String processingBy) {
-        Alert alert = alertRepository.findByAlertNo(alertNo)
-                .orElseThrow(() -> new RuntimeException("报警不存在: " + alertNo));
+        Alert alert = alertRepository.selectOne(new LambdaQueryWrapper<Alert>().eq(Alert::getAlertNo, alertNo));
+        if (alert == null) {
+            throw new RuntimeException("报警不存在: " + alertNo);
+        }
 
-        if (alert.getStatus() != AlertStatus.CONFIRMED.getValue() && alert.getStatus() != AlertStatus.PENDING.getValue()) {
-            throw new RuntimeException("报警状态不允许进入处置中");
+        if (alert.getStatus() != AlertStatus.CONFIRMED.getValue()) {
+            throw new RuntimeException("报警状态不是已确认状态，无法开始处置。当前状态: " + alert.getStatus() + "，要求状态: CONFIRMED(4)");
         }
 
         alert.setStatus(AlertStatus.PROCESSING.getValue());
         alert.setProcessingBy(processingBy);
         alert.setProcessingAt(LocalDateTime.now());
-        alert = alertRepository.save(alert);
+        alertRepository.updateById(alert);
 
         AlertDisposalRecord record = new AlertDisposalRecord();
         record.setAlertNo(alertNo);
         record.setDisposalType(DisposalType.PROCESS.name());
         record.setDisposalMeasures("开始处置报警");
         record.setOperator(processingBy);
-        disposalRecordRepository.save(record);
+        disposalRecordRepository.insert(record);
 
         AlertDTO dto = convertToDTO(alert);
         webSocketPushService.pushAlert(dto);
@@ -148,16 +152,18 @@ public class AlertLifecycleService {
 
     @Transactional
     public Alert recoverAlert(String alertNo, BigDecimal recoveryValue, LocalDateTime recoveryTime) {
-        Alert alert = alertRepository.findByAlertNo(alertNo)
-                .orElseThrow(() -> new RuntimeException("报警不存在: " + alertNo));
+        Alert alert = alertRepository.selectOne(new LambdaQueryWrapper<Alert>().eq(Alert::getAlertNo, alertNo));
+        if (alert == null) {
+            throw new RuntimeException("报警不存在: " + alertNo);
+        }
 
-        if (alert.getStatus() != AlertStatus.PROCESSING.getValue() && alert.getStatus() != AlertStatus.CONFIRMED.getValue()) {
-            throw new RuntimeException("报警状态不允许标记恢复");
+        if (alert.getStatus() != AlertStatus.PROCESSING.getValue()) {
+            throw new RuntimeException("报警状态不是处置中状态，无法标记恢复。当前状态: " + alert.getStatus() + "，要求状态: PROCESSING(1)");
         }
 
         alert.setStatus(AlertStatus.RECOVERED.getValue());
         alert.setRecoveredAt(recoveryTime != null ? recoveryTime : LocalDateTime.now());
-        alert = alertRepository.save(alert);
+        alertRepository.updateById(alert);
 
         AlertDisposalRecord record = new AlertDisposalRecord();
         record.setAlertNo(alertNo);
@@ -166,7 +172,7 @@ public class AlertLifecycleService {
         record.setRecoveryValue(recoveryValue);
         record.setRecoveryTime(alert.getRecoveredAt());
         record.setOperator(alert.getProcessingBy() != null ? alert.getProcessingBy() : alert.getConfirmedBy());
-        disposalRecordRepository.save(record);
+        disposalRecordRepository.insert(record);
 
         AlertDTO dto = convertToDTO(alert);
         webSocketPushService.pushAlert(dto);
@@ -178,17 +184,19 @@ public class AlertLifecycleService {
     @Transactional
     public Alert closeAlert(String alertNo, String closedBy, String closingMeasures,
                             String imageUrls, String remark) {
-        Alert alert = alertRepository.findByAlertNo(alertNo)
-                .orElseThrow(() -> new RuntimeException("报警不存在: " + alertNo));
+        Alert alert = alertRepository.selectOne(new LambdaQueryWrapper<Alert>().eq(Alert::getAlertNo, alertNo));
+        if (alert == null) {
+            throw new RuntimeException("报警不存在: " + alertNo);
+        }
 
-        if (alert.getStatus() != AlertStatus.RECOVERED.getValue() && alert.getStatus() != AlertStatus.PROCESSING.getValue()) {
-            throw new RuntimeException("报警状态不允许关闭");
+        if (alert.getStatus() != AlertStatus.RECOVERED.getValue()) {
+            throw new RuntimeException("报警状态不是已恢复状态，无法关闭。当前状态: " + alert.getStatus() + "，要求状态: RECOVERED(5)");
         }
 
         alert.setStatus(AlertStatus.CLOSED.getValue());
         alert.setClosedBy(closedBy);
         alert.setClosedAt(LocalDateTime.now());
-        alert = alertRepository.save(alert);
+        alertRepository.updateById(alert);
 
         AlertDisposalRecord record = new AlertDisposalRecord();
         record.setAlertNo(alertNo);
@@ -197,7 +205,7 @@ public class AlertLifecycleService {
         record.setImageUrls(imageUrls);
         record.setOperator(closedBy);
         record.setRemark(remark);
-        disposalRecordRepository.save(record);
+        disposalRecordRepository.insert(record);
 
         removeFromUnconfirmedQueue(alertNo);
 
@@ -212,8 +220,10 @@ public class AlertLifecycleService {
     public AlertDisposalRecord addDisposalRecord(String alertNo, String disposalMeasures,
                                                   String imageUrls, String operator,
                                                   String operatorRole, String remark) {
-        Alert alert = alertRepository.findByAlertNo(alertNo)
-                .orElseThrow(() -> new RuntimeException("报警不存在: " + alertNo));
+        Alert alert = alertRepository.selectOne(new LambdaQueryWrapper<Alert>().eq(Alert::getAlertNo, alertNo));
+        if (alert == null) {
+            throw new RuntimeException("报警不存在: " + alertNo);
+        }
 
         AlertDisposalRecord record = new AlertDisposalRecord();
         record.setAlertNo(alertNo);
@@ -223,7 +233,8 @@ public class AlertLifecycleService {
         record.setOperator(operator);
         record.setOperatorRole(operatorRole);
         record.setRemark(remark);
-        return disposalRecordRepository.save(record);
+        disposalRecordRepository.insert(record);
+        return record;
     }
 
     @Transactional
@@ -238,7 +249,7 @@ public class AlertLifecycleService {
             logEntry.setToLevel(toLevel.getValue());
             logEntry.setEscalationReason("超过" + escalationTimeoutMinutes + "分钟未确认，自动升级");
             logEntry.setNotificationChannels("WECHAT_WORK,SMS,VOICE");
-            escalationLogRepository.save(logEntry);
+            escalationLogRepository.insert(logEntry);
 
             Map<String, Object> params = Map.of(
                     "channels", List.of("WECHAT_WORK", "SMS", "VOICE"),
@@ -268,31 +279,30 @@ public class AlertLifecycleService {
         return result;
     }
 
-    public Page<Alert> searchAlerts(Integer status, String level, String sensorId,
-                                     String tunnel, String sensorType,
-                                     LocalDateTime startTime, LocalDateTime endTime,
-                                     int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+    public IPage<Alert> searchAlerts(Integer status, String level, String sensorId,
+                                      String tunnel, String sensorType,
+                                      LocalDateTime startTime, LocalDateTime endTime,
+                                      int page, int size) {
+        Page<Alert> pageParam = new Page<>(page + 1, size).addOrder(OrderItem.desc("created_at"));
+        LambdaQueryWrapper<Alert> wrapper = new LambdaQueryWrapper<>();
 
         if (tunnel != null && startTime != null && endTime != null) {
-            return alertRepository.findByTunnelAndFirstAlertTimeBetweenOrderByCreatedAtDesc(tunnel, startTime, endTime, pageable);
+            wrapper.eq(Alert::getTunnel, tunnel)
+                   .between(Alert::getFirstAlertTime, startTime, endTime);
+        } else if (sensorType != null && startTime != null && endTime != null) {
+            wrapper.eq(Alert::getSensorType, sensorType)
+                   .between(Alert::getFirstAlertTime, startTime, endTime);
+        } else if (startTime != null && endTime != null) {
+            wrapper.between(Alert::getFirstAlertTime, startTime, endTime);
+        } else if (status != null) {
+            wrapper.eq(Alert::getStatus, status);
+        } else if (level != null) {
+            wrapper.eq(Alert::getLevel, level);
+        } else if (sensorId != null) {
+            wrapper.eq(Alert::getSensorId, sensorId);
         }
-        if (sensorType != null && startTime != null && endTime != null) {
-            return alertRepository.findBySensorTypeAndFirstAlertTimeBetweenOrderByCreatedAtDesc(sensorType, startTime, endTime, pageable);
-        }
-        if (startTime != null && endTime != null) {
-            return alertRepository.findByFirstAlertTimeBetweenOrderByCreatedAtDesc(startTime, endTime, pageable);
-        }
-        if (status != null) {
-            return alertRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
-        }
-        if (level != null) {
-            return alertRepository.findByLevelOrderByCreatedAtDesc(level, pageable);
-        }
-        if (sensorId != null) {
-            return alertRepository.findBySensorIdOrderByCreatedAtDesc(sensorId, pageable);
-        }
-        return alertRepository.findAll(pageable);
+
+        return alertRepository.selectPage(pageParam, wrapper);
     }
 
     public Map<String, Object> getAlertStatistics(LocalDateTime startTime, LocalDateTime endTime) {
@@ -305,11 +315,11 @@ public class AlertLifecycleService {
             endTime = LocalDateTime.now();
         }
 
-        stats.put("pendingCount", alertRepository.countByStatus(AlertStatus.PENDING.getValue()));
-        stats.put("confirmedCount", alertRepository.countByStatus(AlertStatus.CONFIRMED.getValue()));
-        stats.put("processingCount", alertRepository.countByStatus(AlertStatus.PROCESSING.getValue()));
-        stats.put("recoveredCount", alertRepository.countByStatus(AlertStatus.RECOVERED.getValue()));
-        stats.put("closedCount", alertRepository.countByStatus(AlertStatus.CLOSED.getValue()));
+        stats.put("pendingCount", alertRepository.selectCount(new LambdaQueryWrapper<Alert>().eq(Alert::getStatus, AlertStatus.PENDING.getValue())));
+        stats.put("confirmedCount", alertRepository.selectCount(new LambdaQueryWrapper<Alert>().eq(Alert::getStatus, AlertStatus.CONFIRMED.getValue())));
+        stats.put("processingCount", alertRepository.selectCount(new LambdaQueryWrapper<Alert>().eq(Alert::getStatus, AlertStatus.PROCESSING.getValue())));
+        stats.put("recoveredCount", alertRepository.selectCount(new LambdaQueryWrapper<Alert>().eq(Alert::getStatus, AlertStatus.RECOVERED.getValue())));
+        stats.put("closedCount", alertRepository.selectCount(new LambdaQueryWrapper<Alert>().eq(Alert::getStatus, AlertStatus.CLOSED.getValue())));
 
         List<Object[]> tunnelStats = alertRepository.countByTunnelBetween(startTime, endTime);
         Map<String, Long> byTunnel = new HashMap<>();
@@ -346,29 +356,35 @@ public class AlertLifecycleService {
     }
 
     public List<AlertDisposalRecord> getDisposalRecords(String alertNo) {
-        return disposalRecordRepository.findByAlertNoOrderByCreatedAtDesc(alertNo);
+        return disposalRecordRepository.selectList(new LambdaQueryWrapper<AlertDisposalRecord>()
+                .eq(AlertDisposalRecord::getAlertNo, alertNo)
+                .orderByDesc(AlertDisposalRecord::getCreatedAt));
     }
 
     public List<AlertEscalationLog> getEscalationLogs(String alertNo) {
-        return escalationLogRepository.findByAlertNoOrderByCreatedAtDesc(alertNo);
+        return escalationLogRepository.selectList(new LambdaQueryWrapper<AlertEscalationLog>()
+                .eq(AlertEscalationLog::getAlertNo, alertNo)
+                .orderByDesc(AlertEscalationLog::getCreatedAt));
     }
 
     public List<Alert> getRealtimeUnconfirmedAlerts() {
-        return alertRepository.findAllUnconfirmedAndConfirmed();
+        return alertRepository.selectList(new LambdaQueryWrapper<Alert>()
+                .in(Alert::getStatus, AlertStatus.PENDING.getValue(), AlertStatus.CONFIRMED.getValue()));
     }
 
     public List<Alert> exportAlerts(LocalDateTime startTime, LocalDateTime endTime,
                                      String tunnel, String sensorType) {
+        LambdaQueryWrapper<Alert> wrapper = new LambdaQueryWrapper<>();
         if (tunnel != null) {
-            return alertRepository.findByTunnelAndFirstAlertTimeBetweenOrderByCreatedAtDesc(
-                    tunnel, startTime, endTime, PageRequest.of(0, 10000)).getContent();
+            wrapper.eq(Alert::getTunnel, tunnel);
         }
         if (sensorType != null) {
-            return alertRepository.findBySensorTypeAndFirstAlertTimeBetweenOrderByCreatedAtDesc(
-                    sensorType, startTime, endTime, PageRequest.of(0, 10000)).getContent();
+            wrapper.eq(Alert::getSensorType, sensorType);
         }
-        return alertRepository.findByFirstAlertTimeBetweenOrderByCreatedAtDesc(
-                startTime, endTime, PageRequest.of(0, 10000)).getContent();
+        wrapper.between(Alert::getFirstAlertTime, startTime, endTime)
+               .orderByDesc(Alert::getCreatedAt)
+               .last("LIMIT 10000");
+        return alertRepository.selectList(wrapper);
     }
 
     private void addToUnconfirmedQueue(String alertNo, String level) {

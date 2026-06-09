@@ -1,6 +1,10 @@
 package com.mine.safety.domain;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -12,111 +16,77 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "plc_devices")
+@TableName("plc_devices")
 public class PlcDevice {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "device_code", length = 64, nullable = false, unique = true)
+    @TableField("device_code")
     private String deviceCode;
 
-    @Column(name = "device_name", length = 128, nullable = false)
+    @TableField("device_name")
     private String deviceName;
 
-    @Column(name = "device_type", length = 32, nullable = false)
+    @TableField("device_type")
     private String deviceType;
 
-    @Column(name = "protocol", length = 32, nullable = false)
+    @TableField("protocol")
     private String protocol;
 
-    @Column(name = "ip_address", length = 64)
+    @TableField("ip_address")
     private String ipAddress;
 
-    @Column(name = "port")
+    @TableField("port")
     private Integer port;
 
-    @Column(name = "slave_id")
-    private Integer slaveId;
+    @TableField("slave_id")
+    private Integer slaveId = 1;
 
-    @Column(name = "rack")
-    private Integer rack;
+    @TableField("rack")
+    private Integer rack = 0;
 
-    @Column(name = "slot")
-    private Integer slot;
+    @TableField("slot")
+    private Integer slot = 1;
 
-    @Column(name = "register_address", length = 64)
+    @TableField("register_address")
     private String registerAddress;
 
-    @Column(name = "register_type", length = 32)
+    @TableField("register_type")
     private String registerType;
 
-    @Column(name = "data_type", length = 32)
-    private String dataType;
+    @TableField("data_type")
+    private String dataType = "BOOL";
 
-    @Column(name = "zone_code", length = 32)
+    @TableField("zone_code")
     private String zoneCode;
 
-    @Column(name = "location", length = 256)
+    @TableField("location")
     private String location;
 
-    @Column(name = "on_value", length = 32)
-    private String onValue;
+    @TableField("on_value")
+    private String onValue = "1";
 
-    @Column(name = "off_value", length = 32)
-    private String offValue;
+    @TableField("off_value")
+    private String offValue = "0";
 
-    @Column(name = "status")
+    @TableField("status")
     private Integer status;
 
-    @Column(name = "last_online_time")
+    @TableField("last_online_time")
     private LocalDateTime lastOnlineTime;
 
-    @Column(name = "enabled")
-    private Boolean enabled;
+    @TableField("enabled")
+    private Boolean enabled = true;
 
-    @Column(name = "description", length = 512)
+    @TableField("description")
     private String description;
 
-    @Column(name = "created_at")
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (enabled == null) {
-            enabled = true;
-        }
-        if (slaveId == null) {
-            slaveId = 1;
-        }
-        if (rack == null) {
-            rack = 0;
-        }
-        if (slot == null) {
-            slot = 1;
-        }
-        if (onValue == null) {
-            onValue = "1";
-        }
-        if (offValue == null) {
-            offValue = "0";
-        }
-        if (dataType == null) {
-            dataType = "BOOL";
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 
     public enum DeviceType {
         PLC_SOUND_LIGHT, PLC_BROADCAST, PLC_POWER_CONTROL, PLC_OTHER

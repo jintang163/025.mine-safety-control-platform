@@ -1,6 +1,7 @@
 package com.mine.safety.controller;
 
 import com.mine.safety.domain.AlertRuleDefinition;
+import com.mine.safety.domain.RuleActionRelation;
 import com.mine.safety.dto.AlertRuleDTO;
 import com.mine.safety.dto.ResponseDTO;
 import com.mine.safety.repository.AlertRuleDefinitionRepository;
@@ -8,9 +9,9 @@ import com.mine.safety.repository.RuleActionRelationRepository;
 import com.mine.safety.service.RuleEngineService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,10 +28,13 @@ public class AlertRuleController {
     private final RuleEngineService ruleEngineService;
 
     @GetMapping
-    public ResponseDTO<Page<AlertRuleDTO>> getRules(
-            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
-        Page<AlertRuleDefinition> page = ruleRepository.findAll(pageable);
-        return ResponseDTO.success(page.map(AlertRuleDTO::fromEntity));
+    public ResponseDTO<IPage<AlertRuleDTO>> getRules(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        IPage<AlertRuleDefinition> entityPage = ruleRepository.selectPage(new Page<>(page, size), null);
+        Page<AlertRuleDTO> result = new Page<>(entityPage.getCurrent(), entityPage.getSize(), entityPage.getTotal());
+        result.setRecords(entityPage.getRecords().stream().map(AlertRuleDTO::fromEntity).toList());
+        return ResponseDTO.success(result);
     }
 
     @GetMapping("/enabled")
@@ -41,33 +45,39 @@ public class AlertRuleController {
 
     @GetMapping("/type/{ruleType}")
     public ResponseDTO<List<AlertRuleDTO>> getRulesByType(@PathVariable String ruleType) {
-        List<AlertRuleDefinition> rules = ruleRepository.findByRuleTypeAndEnabled(ruleType, true);
+        List<AlertRuleDefinition> rules = ruleRepository.selectList(
+                new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleType, ruleType).eq(AlertRuleDefinition::getEnabled, true));
         return ResponseDTO.success(rules.stream().map(AlertRuleDTO::fromEntity).toList());
     }
 
     @GetMapping("/{id}")
     public ResponseDTO<AlertRuleDTO> getRuleById(@PathVariable Long id) {
-        return ruleRepository.findById(id)
-                .map(rule -> ResponseDTO.success(AlertRuleDTO.fromEntity(rule)))
-                .orElse(ResponseDTO.error("规则不存在"));
+        AlertRuleDefinition rule = ruleRepository.selectById(id);
+        if (rule == null) {
+            return ResponseDTO.error("规则不存在");
+        }
+        return ResponseDTO.success(AlertRuleDTO.fromEntity(rule));
     }
 
     @GetMapping("/code/{ruleCode}")
     public ResponseDTO<AlertRuleDTO> getRuleByCode(@PathVariable String ruleCode) {
-        return ruleRepository.findByRuleCode(ruleCode)
-                .map(rule -> ResponseDTO.success(AlertRuleDTO.fromEntity(rule)))
-                .orElse(ResponseDTO.error("规则不存在"));
+        AlertRuleDefinition rule = ruleRepository.selectOne(
+                new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleCode, ruleCode));
+        if (rule == null) {
+            return ResponseDTO.error("规则不存在");
+        }
+        return ResponseDTO.success(AlertRuleDTO.fromEntity(rule));
     }
 
     @PostMapping
     public ResponseDTO<AlertRuleDTO> createRule(@RequestBody AlertRuleDTO dto) {
-        if (ruleRepository.existsByRuleCode(dto.getRuleCode())) {
+        if (ruleRepository.selectCount(new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleCode, dto.getRuleCode())) > 0) {
             return ResponseDTO.error("规则编码已存在");
         }
 
         AlertRuleDefinition rule = dto.toEntity();
         rule.setVersion(1);
-        rule = ruleRepository.save(rule);
+        ruleRepository.insert(rule);
 
         log.info("创建规则成功 - 规则: {}, 编码: {}", rule.getRuleName(), rule.getRuleCode());
         return ResponseDTO.success(AlertRuleDTO.fromEntity(rule));
@@ -75,36 +85,37 @@ public class AlertRuleController {
 
     @PutMapping("/{id}")
     public ResponseDTO<AlertRuleDTO> updateRule(@PathVariable Long id, @RequestBody AlertRuleDTO dto) {
-        return ruleRepository.findById(id)
-                .map(rule -> {
-                    rule.setRuleName(dto.getRuleName());
-                    rule.setRuleType(dto.getRuleType());
-                    rule.setSensorType(dto.getSensorType());
-                    rule.setSensorId(dto.getSensorId());
-                    rule.setZoneCode(dto.getZoneCode());
-                    rule.setDroolsRule(dto.getDroolsRule());
-                    rule.setGroovyScript(dto.getGroovyScript());
-                    rule.setRuleParams(dto.getRuleParams());
-                    rule.setLevel(dto.getLevel());
-                    rule.setDescription(dto.getDescription());
-                    rule.setEnabled(dto.getEnabled());
-                    rule.setVersion(rule.getVersion() + 1);
-                    rule.setUpdatedBy(dto.getUpdatedBy());
+        AlertRuleDefinition rule = ruleRepository.selectById(id);
+        if (rule == null) {
+            return ResponseDTO.error("规则不存在");
+        }
 
-                    AlertRuleDefinition saved = ruleRepository.save(rule);
-                    log.info("更新规则成功 - 规则: {}", saved.getRuleCode());
-                    return ResponseDTO.success(AlertRuleDTO.fromEntity(saved));
-                })
-                .orElse(ResponseDTO.error("规则不存在"));
+        rule.setRuleName(dto.getRuleName());
+        rule.setRuleType(dto.getRuleType());
+        rule.setSensorType(dto.getSensorType());
+        rule.setSensorId(dto.getSensorId());
+        rule.setZoneCode(dto.getZoneCode());
+        rule.setDroolsRule(dto.getDroolsRule());
+        rule.setGroovyScript(dto.getGroovyScript());
+        rule.setRuleParams(dto.getRuleParams());
+        rule.setLevel(dto.getLevel());
+        rule.setDescription(dto.getDescription());
+        rule.setEnabled(dto.getEnabled());
+        rule.setVersion(rule.getVersion() + 1);
+        rule.setUpdatedBy(dto.getUpdatedBy());
+
+        ruleRepository.updateById(rule);
+        log.info("更新规则成功 - 规则: {}", rule.getRuleCode());
+        return ResponseDTO.success(AlertRuleDTO.fromEntity(rule));
     }
 
     @DeleteMapping("/{id}")
     public ResponseDTO<Void> deleteRule(@PathVariable Long id) {
-        if (!ruleRepository.existsById(id)) {
+        if (ruleRepository.selectById(id) == null) {
             return ResponseDTO.error("规则不存在");
         }
 
-        relationRepository.deleteByRuleId(id);
+        relationRepository.delete(new LambdaQueryWrapper<RuleActionRelation>().eq(RuleActionRelation::getRuleId, id));
         ruleRepository.deleteById(id);
         log.info("删除规则成功 - ID: {}", id);
         return ResponseDTO.success();
@@ -112,26 +123,26 @@ public class AlertRuleController {
 
     @PutMapping("/{id}/enable")
     public ResponseDTO<AlertRuleDTO> enableRule(@PathVariable Long id) {
-        return ruleRepository.findById(id)
-                .map(rule -> {
-                    rule.setEnabled(true);
-                    AlertRuleDefinition saved = ruleRepository.save(rule);
-                    log.info("启用规则 - 编码: {}", saved.getRuleCode());
-                    return ResponseDTO.success(AlertRuleDTO.fromEntity(saved));
-                })
-                .orElse(ResponseDTO.error("规则不存在"));
+        AlertRuleDefinition rule = ruleRepository.selectById(id);
+        if (rule == null) {
+            return ResponseDTO.error("规则不存在");
+        }
+        rule.setEnabled(true);
+        ruleRepository.updateById(rule);
+        log.info("启用规则 - 编码: {}", rule.getRuleCode());
+        return ResponseDTO.success(AlertRuleDTO.fromEntity(rule));
     }
 
     @PutMapping("/{id}/disable")
     public ResponseDTO<AlertRuleDTO> disableRule(@PathVariable Long id) {
-        return ruleRepository.findById(id)
-                .map(rule -> {
-                    rule.setEnabled(false);
-                    AlertRuleDefinition saved = ruleRepository.save(rule);
-                    log.info("禁用规则 - 编码: {}", saved.getRuleCode());
-                    return ResponseDTO.success(AlertRuleDTO.fromEntity(saved));
-                })
-                .orElse(ResponseDTO.error("规则不存在"));
+        AlertRuleDefinition rule = ruleRepository.selectById(id);
+        if (rule == null) {
+            return ResponseDTO.error("规则不存在");
+        }
+        rule.setEnabled(false);
+        ruleRepository.updateById(rule);
+        log.info("禁用规则 - 编码: {}", rule.getRuleCode());
+        return ResponseDTO.success(AlertRuleDTO.fromEntity(rule));
     }
 
     @PostMapping("/reload")
@@ -146,11 +157,11 @@ public class AlertRuleController {
 
     @GetMapping("/statistics")
     public ResponseDTO<Map<String, Object>> getRuleStatistics() {
-        long total = ruleRepository.count();
-        long enabledCount = ruleRepository.findByEnabled(true).size();
-        long singleCount = ruleRepository.findByRuleTypeAndEnabled("SINGLE_THRESHOLD", true).size();
-        long trendCount = ruleRepository.findByRuleTypeAndEnabled("TREND", true).size();
-        long compoundCount = ruleRepository.findByRuleTypeAndEnabled("COMPOUND", true).size();
+        long total = ruleRepository.selectCount(null);
+        long enabledCount = ruleRepository.selectCount(new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getEnabled, true));
+        long singleCount = ruleRepository.selectCount(new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleType, "SINGLE_THRESHOLD").eq(AlertRuleDefinition::getEnabled, true));
+        long trendCount = ruleRepository.selectCount(new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleType, "TREND").eq(AlertRuleDefinition::getEnabled, true));
+        long compoundCount = ruleRepository.selectCount(new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleType, "COMPOUND").eq(AlertRuleDefinition::getEnabled, true));
 
         return ResponseDTO.success(Map.of(
                 "total", total,

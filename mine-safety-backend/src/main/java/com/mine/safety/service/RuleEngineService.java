@@ -1,6 +1,7 @@
 package com.mine.safety.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mine.safety.domain.AlertRuleDefinition;
 import com.mine.safety.domain.AlertRuleDefinition.RuleType;
 import com.mine.safety.domain.LinkageAction;
@@ -201,17 +202,17 @@ public class RuleEngineService {
     }
 
     private String getRuleNameByCode(String ruleCode) {
-        return ruleRepository.findByRuleCode(ruleCode)
-                .map(AlertRuleDefinition::getRuleName)
-                .orElse(ruleCode);
+        AlertRuleDefinition rule = ruleRepository.selectOne(
+                new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleCode, ruleCode));
+        return rule != null ? rule.getRuleName() : ruleCode;
     }
 
     private void triggerLinkageActions(RuleSensorData ruleData, AlertDTO alert) {
         try {
             String ruleCode = ruleData.getAlertRuleCode();
-            Long ruleId = ruleRepository.findByRuleCode(ruleCode)
-                    .map(AlertRuleDefinition::getId)
-                    .orElse(null);
+            AlertRuleDefinition ruleDef = ruleRepository.selectOne(
+                    new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleCode, ruleCode));
+            Long ruleId = ruleDef != null ? ruleDef.getId() : null;
 
             if (ruleId == null) {
                 return;
@@ -234,14 +235,16 @@ public class RuleEngineService {
     }
 
     public List<AlertRuleDefinition> getAllRules() {
-        return ruleRepository.findAll();
+        return ruleRepository.selectList(null);
     }
 
     public List<AlertRuleDefinition> getEnabledRules() {
-        return ruleRepository.findByEnabled(true);
+        return ruleRepository.selectList(new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getEnabled, true));
     }
 
     public List<AlertRuleDefinition> getRulesByType(RuleType ruleType) {
-        return ruleRepository.findByRuleTypeAndEnabled(ruleType.name(), true);
+        return ruleRepository.selectList(new LambdaQueryWrapper<AlertRuleDefinition>()
+                .eq(AlertRuleDefinition::getRuleType, ruleType.name())
+                .eq(AlertRuleDefinition::getEnabled, true));
     }
 }

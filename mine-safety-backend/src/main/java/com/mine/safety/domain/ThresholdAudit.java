@@ -1,51 +1,46 @@
 package com.mine.safety.domain;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-@Entity
-@Table(name = "threshold_audit", indexes = {
-        @Index(name = "idx_sensor_id", columnList = "sensor_id"),
-        @Index(name = "idx_threshold_type", columnList = "threshold_type"),
-        @Index(name = "idx_created_at", columnList = "created_at")
-})
+@TableName("threshold_audit")
 public class ThresholdAudit {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "sensor_id", nullable = false, length = 64)
+    @TableField("sensor_id")
     private String sensorId;
 
-    @Column(name = "threshold_type", nullable = false, length = 32)
+    @TableField("threshold_type")
     private String thresholdType;
 
-    @Column(name = "old_value", precision = 10, scale = 4)
+    @TableField("old_value")
     private BigDecimal oldValue;
 
-    @Column(name = "new_value", nullable = false, precision = 10, scale = 4)
+    @TableField("new_value")
     private BigDecimal newValue;
 
-    @Column(nullable = false, length = 64)
     private String operator;
 
-    @Column(name = "operation_type", nullable = false, length = 32)
+    @TableField("operation_type")
     private String operationType;
 
-    @Column(name = "approval_id")
+    @TableField("approval_id")
     private Long approvalId;
 
-    @Column(name = "change_reason", length = 512)
+    @TableField("change_reason")
     private String changeReason;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
     public enum ThresholdType {

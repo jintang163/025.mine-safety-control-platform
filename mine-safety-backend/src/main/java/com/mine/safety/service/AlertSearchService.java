@@ -1,13 +1,13 @@
 package com.mine.safety.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mine.safety.domain.Alert;
 import com.mine.safety.repository.AlertRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
@@ -73,10 +73,10 @@ public class AlertSearchService {
         }
     }
 
-    public Page<Map<String, Object>> searchAlerts(String keyword, String level, String tunnel,
-                                                    String sensorType, String status,
-                                                    LocalDateTime startTime, LocalDateTime endTime,
-                                                    Pageable pageable) {
+    public IPage<Map<String, Object>> searchAlerts(String keyword, String level, String tunnel,
+                                                     String sensorType, String status,
+                                                     LocalDateTime startTime, LocalDateTime endTime,
+                                                     int page, int size) {
         try {
             var boolQuery = co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery.of(b -> {
                 if (keyword != null && !keyword.isEmpty()) {
@@ -112,9 +112,10 @@ public class AlertSearchService {
                 return b;
             });
 
+            Page<Map<String, Object>> mpPage = new Page<>(page, size);
             NativeQuery searchQuery = NativeQuery.builder()
                     .withQuery(q -> q.bool(boolQuery._toQuery()))
-                    .withPageable(pageable)
+                    .withPageable(org.springframework.data.domain.PageRequest.of(page - 1, size))
                     .build();
 
             SearchHits<Map> searchHits = elasticsearchOperations.search(searchQuery, Map.class, IndexCoordinates.of(INDEX_NAME));
@@ -128,16 +129,18 @@ public class AlertSearchService {
                     })
                     .collect(Collectors.toList());
 
-            return new PageImpl<>(content, pageable, searchHits.getTotalHits());
+            mpPage.setRecords(content);
+            mpPage.setTotal(searchHits.getTotalHits());
+            return mpPage;
         } catch (Exception e) {
             log.error("ES搜索报警失败: {}", e.getMessage(), e);
-            return Page.empty(pageable);
+            return new Page<>(page, size);
         }
     }
 
     public void reindexAll() {
         try {
-            List<Alert> allAlerts = alertRepository.findAll();
+            List<Alert> allAlerts = alertRepository.selectList(null);
             for (Alert alert : allAlerts) {
                 indexAlert(alert);
             }

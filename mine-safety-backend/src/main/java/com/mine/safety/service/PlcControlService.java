@@ -1,6 +1,7 @@
 package com.mine.safety.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mine.safety.domain.PlcDevice;
 import com.mine.safety.netty.client.ModbusTcpClient;
 import com.mine.safety.repository.PlcDeviceRepository;
@@ -25,8 +26,11 @@ public class PlcControlService {
         log.info("触发声光报警 - 区域: {}, 参数: {}", zoneCode, params);
 
         try {
-            List<PlcDevice> devices = plcDeviceRepository.findByDeviceTypeAndZoneCodeAndEnabled(
-                    "PLC_SOUND_LIGHT", zoneCode, true);
+            List<PlcDevice> devices = plcDeviceRepository.selectList(
+                    new LambdaQueryWrapper<PlcDevice>()
+                            .eq(PlcDevice::getDeviceType, "PLC_SOUND_LIGHT")
+                            .eq(PlcDevice::getZoneCode, zoneCode)
+                            .eq(PlcDevice::getEnabled, true));
 
             if (devices.isEmpty()) {
                 return ActionResult.failure("No sound light devices found for zone: " + zoneCode);
@@ -63,8 +67,11 @@ public class PlcControlService {
         log.info("触发语音广播 - 区域: {}, 参数: {}", zoneCode, params);
 
         try {
-            List<PlcDevice> devices = plcDeviceRepository.findByDeviceTypeAndZoneCodeAndEnabled(
-                    "PLC_BROADCAST", zoneCode, true);
+            List<PlcDevice> devices = plcDeviceRepository.selectList(
+                    new LambdaQueryWrapper<PlcDevice>()
+                            .eq(PlcDevice::getDeviceType, "PLC_BROADCAST")
+                            .eq(PlcDevice::getZoneCode, zoneCode)
+                            .eq(PlcDevice::getEnabled, true));
 
             if (devices.isEmpty()) {
                 return ActionResult.failure("No broadcast devices found for zone: " + zoneCode);
@@ -105,8 +112,11 @@ public class PlcControlService {
         log.info("触发远程断电 - 区域: {}, 参数: {}", zoneCode, params);
 
         try {
-            List<PlcDevice> devices = plcDeviceRepository.findByDeviceTypeAndZoneCodeAndEnabled(
-                    "PLC_POWER_CONTROL", zoneCode, true);
+            List<PlcDevice> devices = plcDeviceRepository.selectList(
+                    new LambdaQueryWrapper<PlcDevice>()
+                            .eq(PlcDevice::getDeviceType, "PLC_POWER_CONTROL")
+                            .eq(PlcDevice::getZoneCode, zoneCode)
+                            .eq(PlcDevice::getEnabled, true));
 
             if (devices.isEmpty()) {
                 return ActionResult.failure("No power control devices found for zone: " + zoneCode);
@@ -208,11 +218,12 @@ public class PlcControlService {
     }
 
     public boolean testDeviceConnection(String deviceCode) {
-        return plcDeviceRepository.findByDeviceCode(deviceCode)
-                .map(device -> {
-                    ModbusTcpClient client = getOrCreateClient(device);
-                    return client.isConnected();
-                })
-                .orElse(false);
+        PlcDevice device = plcDeviceRepository.selectOne(
+                new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getDeviceCode, deviceCode));
+        if (device == null) {
+            return false;
+        }
+        ModbusTcpClient client = getOrCreateClient(device);
+        return client.isConnected();
     }
 }

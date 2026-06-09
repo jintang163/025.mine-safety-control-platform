@@ -1,5 +1,6 @@
 package com.mine.safety.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.alibaba.fastjson2.JSON;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.dto.ThresholdDTO;
@@ -35,7 +36,7 @@ public class ThresholdCacheService {
     public void init() {
         log.info("开始初始化阈值缓存...");
         try {
-            for (Sensor sensor : sensorRepository.findAll()) {
+            for (Sensor sensor : sensorRepository.selectList(null)) {
                 cacheThreshold(sensor);
             }
             log.info("阈值缓存初始化完成，共 {} 个传感器", localCache.size());
@@ -62,7 +63,8 @@ public class ThresholdCacheService {
             log.warn("读取Redis阈值缓存失败: {}", e.getMessage());
         }
 
-        Sensor sensor = sensorRepository.findBySensorId(sensorId).orElse(null);
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, sensorId));
         if (sensor != null) {
             ThresholdDTO dto = convertToDTO(sensor);
             cacheThreshold(sensor);
@@ -96,7 +98,11 @@ public class ThresholdCacheService {
             log.warn("删除Redis阈值缓存失败: {}", e.getMessage());
         }
 
-        sensorRepository.findBySensorId(sensorId).ifPresent(this::cacheThreshold);
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, sensorId));
+        if (sensor != null) {
+            cacheThreshold(sensor);
+        }
         log.info("阈值缓存已刷新 - 传感器: {}", sensorId);
     }
 

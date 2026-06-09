@@ -1,12 +1,15 @@
 package com.mine.safety.domain;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -15,88 +18,56 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "linkage_actions")
+@TableName(value = "linkage_actions", autoResultMap = true)
 public class LinkageAction {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "action_code", length = 64, nullable = false, unique = true)
+    @TableField("action_code")
     private String actionCode;
 
-    @Column(name = "action_name", length = 128, nullable = false)
+    @TableField("action_name")
     private String actionName;
 
-    @Column(name = "action_type", length = 32, nullable = false)
+    @TableField("action_type")
     private String actionType;
 
-    @Column(name = "target_type", length = 32)
+    @TableField("target_type")
     private String targetType;
 
-    @Column(name = "target_code", length = 64)
+    @TableField("target_code")
     private String targetCode;
 
-    @Column(name = "action_params", columnDefinition = "JSON")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @TableField(value = "action_params", typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> actionParams;
 
-    @Column(name = "execution_mode", length = 16)
-    private String executionMode;
+    @TableField("execution_mode")
+    private String executionMode = "PARALLEL";
 
-    @Column(name = "priority")
-    private Integer priority;
+    @TableField("priority")
+    private Integer priority = 0;
 
-    @Column(name = "timeout_seconds")
-    private Integer timeoutSeconds;
+    @TableField("timeout_seconds")
+    private Integer timeoutSeconds = 30;
 
-    @Column(name = "max_retry")
-    private Integer maxRetry;
+    @TableField("max_retry")
+    private Integer maxRetry = 3;
 
-    @Column(name = "retry_interval_seconds")
-    private Integer retryIntervalSeconds;
+    @TableField("retry_interval_seconds")
+    private Integer retryIntervalSeconds = 5;
 
-    @Column(name = "enabled")
-    private Boolean enabled;
+    @TableField("enabled")
+    private Boolean enabled = true;
 
-    @Column(name = "description", length = 512)
+    @TableField("description")
     private String description;
 
-    @Column(name = "created_at")
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (enabled == null) {
-            enabled = true;
-        }
-        if (executionMode == null) {
-            executionMode = "PARALLEL";
-        }
-        if (priority == null) {
-            priority = 0;
-        }
-        if (timeoutSeconds == null) {
-            timeoutSeconds = 30;
-        }
-        if (maxRetry == null) {
-            maxRetry = 3;
-        }
-        if (retryIntervalSeconds == null) {
-            retryIntervalSeconds = 5;
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 
     public enum ActionType {
         SOUND_LIGHT_ALARM, VOICE_BROADCAST, REMOTE_POWER_OFF, MESSAGE_PUSH, VIDEO_POPUP

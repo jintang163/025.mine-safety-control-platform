@@ -1,65 +1,56 @@
 package com.mine.safety.domain;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-@Entity
-@Table(name = "threshold_approval", indexes = {
-        @Index(name = "idx_approval_no", columnList = "approval_no"),
-        @Index(name = "idx_sensor_id", columnList = "sensor_id"),
-        @Index(name = "idx_status", columnList = "status"),
-        @Index(name = "idx_created_at", columnList = "created_at")
-})
+@TableName("threshold_approval")
 public class ThresholdApproval {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "approval_no", nullable = false, unique = true, length = 64)
+    @TableField("approval_no")
     private String approvalNo;
 
-    @Column(name = "sensor_id", nullable = false, length = 64)
+    @TableField("sensor_id")
     private String sensorId;
 
-    @Column(name = "threshold_type", nullable = false, length = 32)
+    @TableField("threshold_type")
     private String thresholdType;
 
-    @Column(name = "old_value", precision = 10, scale = 4)
+    @TableField("old_value")
     private BigDecimal oldValue;
 
-    @Column(name = "new_value", nullable = false, precision = 10, scale = 4)
+    @TableField("new_value")
     private BigDecimal newValue;
 
-    @Column(nullable = false, length = 64)
     private String applicant;
 
-    @Column(name = "apply_reason", length = 512)
+    @TableField("apply_reason")
     private String applyReason;
 
     private Integer status = 0;
 
-    @Column(length = 64)
     private String approver;
 
-    @Column(name = "approve_comment", length = 512)
+    @TableField("approve_comment")
     private String approveComment;
 
-    @Column(name = "approved_at")
+    @TableField("approved_at")
     private LocalDateTime approvedAt;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    @UpdateTimestamp
-    @Column(name = "updated_at")
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 
     public enum ApprovalStatus {

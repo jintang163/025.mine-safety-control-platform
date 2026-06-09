@@ -1,14 +1,11 @@
 package com.mine.safety.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mine.safety.dto.*;
 import com.mine.safety.service.RealtimeMonitorService;
 import com.mine.safety.service.ThresholdService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -64,12 +61,11 @@ public class ThresholdController {
     }
 
     @GetMapping("/approvals")
-    public ApiResponse<Page<ThresholdApprovalDTO>> getApprovalList(
+    public ApiResponse<IPage<ThresholdApprovalDTO>> getApprovalList(
             @RequestParam(required = false) Integer status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return ApiResponse.success(thresholdService.getApprovalList(status, pageable));
+        return ApiResponse.success(thresholdService.getApprovalList(status, page, size));
     }
 
     @GetMapping("/approvals/{approvalNo}")
@@ -83,14 +79,13 @@ public class ThresholdController {
     }
 
     @GetMapping("/audit")
-    public ApiResponse<Page<ThresholdAuditDTO>> getAuditList(
+    public ApiResponse<IPage<ThresholdAuditDTO>> getAuditList(
             @RequestParam(required = false) String sensorId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return ApiResponse.success(thresholdService.getAuditList(sensorId, startTime, endTime, pageable));
+        return ApiResponse.success(thresholdService.getAuditList(sensorId, startTime, endTime, page, size));
     }
 
     @GetMapping("/monitor/channel/{sensorId}")

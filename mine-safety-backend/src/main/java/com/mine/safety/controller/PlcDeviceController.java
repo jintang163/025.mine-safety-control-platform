@@ -6,9 +6,9 @@ import com.mine.safety.repository.PlcDeviceRepository;
 import com.mine.safety.service.PlcControlService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,83 +24,93 @@ public class PlcDeviceController {
     private final PlcControlService plcControlService;
 
     @GetMapping
-    public ResponseDTO<Page<PlcDevice>> getDevices(
-            @PageableDefault(size = 20, sort = "id") Pageable pageable) {
-        return ResponseDTO.success(plcDeviceRepository.findAll(pageable));
+    public ResponseDTO<IPage<PlcDevice>> getDevices(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseDTO.success(plcDeviceRepository.selectPage(new Page<>(page, size), null));
     }
 
     @GetMapping("/enabled")
     public ResponseDTO<List<PlcDevice>> getEnabledDevices() {
-        return ResponseDTO.success(plcDeviceRepository.findByEnabled(true));
+        return ResponseDTO.success(plcDeviceRepository.selectList(
+                new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getEnabled, true)));
     }
 
     @GetMapping("/type/{deviceType}")
     public ResponseDTO<List<PlcDevice>> getDevicesByType(@PathVariable String deviceType) {
-        return ResponseDTO.success(plcDeviceRepository.findByDeviceTypeAndEnabled(deviceType, true));
+        return ResponseDTO.success(plcDeviceRepository.selectList(
+                new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getDeviceType, deviceType).eq(PlcDevice::getEnabled, true)));
     }
 
     @GetMapping("/zone/{zoneCode}")
     public ResponseDTO<List<PlcDevice>> getDevicesByZone(@PathVariable String zoneCode) {
-        return ResponseDTO.success(plcDeviceRepository.findByZoneCodeAndEnabled(zoneCode, true));
+        return ResponseDTO.success(plcDeviceRepository.selectList(
+                new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getZoneCode, zoneCode).eq(PlcDevice::getEnabled, true)));
     }
 
     @GetMapping("/{id}")
     public ResponseDTO<PlcDevice> getDeviceById(@PathVariable Long id) {
-        return plcDeviceRepository.findById(id)
-                .map(ResponseDTO::success)
-                .orElse(ResponseDTO.error("设备不存在"));
+        PlcDevice device = plcDeviceRepository.selectById(id);
+        if (device == null) {
+            return ResponseDTO.error("设备不存在");
+        }
+        return ResponseDTO.success(device);
     }
 
     @GetMapping("/code/{deviceCode}")
     public ResponseDTO<PlcDevice> getDeviceByCode(@PathVariable String deviceCode) {
-        return plcDeviceRepository.findByDeviceCode(deviceCode)
-                .map(ResponseDTO::success)
-                .orElse(ResponseDTO.error("设备不存在"));
+        PlcDevice device = plcDeviceRepository.selectOne(
+                new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getDeviceCode, deviceCode));
+        if (device == null) {
+            return ResponseDTO.error("设备不存在");
+        }
+        return ResponseDTO.success(device);
     }
 
     @PostMapping
     public ResponseDTO<PlcDevice> createDevice(@RequestBody PlcDevice device) {
-        if (plcDeviceRepository.existsByDeviceCode(device.getDeviceCode())) {
+        if (plcDeviceRepository.selectCount(new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getDeviceCode, device.getDeviceCode())) > 0) {
             return ResponseDTO.error("设备编码已存在");
         }
 
-        PlcDevice saved = plcDeviceRepository.save(device);
-        log.info("创建PLC设备成功 - 设备: {}, 编码: {}", saved.getDeviceName(), saved.getDeviceCode());
-        return ResponseDTO.success(saved);
+        plcDeviceRepository.insert(device);
+        log.info("创建PLC设备成功 - 设备: {}, 编码: {}", device.getDeviceName(), device.getDeviceCode());
+        return ResponseDTO.success(device);
     }
 
     @PutMapping("/{id}")
     public ResponseDTO<PlcDevice> updateDevice(@PathVariable Long id, @RequestBody PlcDevice device) {
-        return plcDeviceRepository.findById(id)
-                .map(existing -> {
-                    existing.setDeviceName(device.getDeviceName());
-                    existing.setDeviceType(device.getDeviceType());
-                    existing.setProtocol(device.getProtocol());
-                    existing.setIpAddress(device.getIpAddress());
-                    existing.setPort(device.getPort());
-                    existing.setSlaveId(device.getSlaveId());
-                    existing.setRack(device.getRack());
-                    existing.setSlot(device.getSlot());
-                    existing.setRegisterAddress(device.getRegisterAddress());
-                    existing.setRegisterType(device.getRegisterType());
-                    existing.setDataType(device.getDataType());
-                    existing.setZoneCode(device.getZoneCode());
-                    existing.setLocation(device.getLocation());
-                    existing.setOnValue(device.getOnValue());
-                    existing.setOffValue(device.getOffValue());
-                    existing.setEnabled(device.getEnabled());
-                    existing.setDescription(device.getDescription());
+        PlcDevice existing = plcDeviceRepository.selectById(id);
+        if (existing == null) {
+            return ResponseDTO.error("设备不存在");
+        }
 
-                    PlcDevice saved = plcDeviceRepository.save(existing);
-                    log.info("更新PLC设备成功 - 设备: {}", saved.getDeviceCode());
-                    return ResponseDTO.success(saved);
-                })
-                .orElse(ResponseDTO.error("设备不存在"));
+        existing.setDeviceName(device.getDeviceName());
+        existing.setDeviceType(device.getDeviceType());
+        existing.setProtocol(device.getProtocol());
+        existing.setIpAddress(device.getIpAddress());
+        existing.setPort(device.getPort());
+        existing.setSlaveId(device.getSlaveId());
+        existing.setRack(device.getRack());
+        existing.setSlot(device.getSlot());
+        existing.setRegisterAddress(device.getRegisterAddress());
+        existing.setRegisterType(device.getRegisterType());
+        existing.setDataType(device.getDataType());
+        existing.setZoneCode(device.getZoneCode());
+        existing.setLocation(device.getLocation());
+        existing.setOnValue(device.getOnValue());
+        existing.setOffValue(device.getOffValue());
+        existing.setEnabled(device.getEnabled());
+        existing.setDescription(device.getDescription());
+
+        plcDeviceRepository.updateById(existing);
+        log.info("更新PLC设备成功 - 设备: {}", existing.getDeviceCode());
+        return ResponseDTO.success(existing);
     }
 
     @DeleteMapping("/{id}")
     public ResponseDTO<Void> deleteDevice(@PathVariable Long id) {
-        if (!plcDeviceRepository.existsById(id)) {
+        if (plcDeviceRepository.selectById(id) == null) {
             return ResponseDTO.error("设备不存在");
         }
 
@@ -111,69 +121,69 @@ public class PlcDeviceController {
 
     @PostMapping("/{id}/test")
     public ResponseDTO<Map<String, Object>> testDeviceConnection(@PathVariable Long id) {
-        return plcDeviceRepository.findById(id)
-                .map(device -> {
-                    boolean connected = plcControlService.testDeviceConnection(device.getDeviceCode());
-                    return ResponseDTO.success(Map.of(
-                            "deviceCode", device.getDeviceCode(),
-                            "connected", connected,
-                            "message", connected ? "连接测试成功" : "连接测试失败"
-                    ));
-                })
-                .orElse(ResponseDTO.error("设备不存在"));
+        PlcDevice device = plcDeviceRepository.selectById(id);
+        if (device == null) {
+            return ResponseDTO.error("设备不存在");
+        }
+        boolean connected = plcControlService.testDeviceConnection(device.getDeviceCode());
+        return ResponseDTO.success(Map.of(
+                "deviceCode", device.getDeviceCode(),
+                "connected", connected,
+                "message", connected ? "连接测试成功" : "连接测试失败"
+        ));
     }
 
     @PostMapping("/{id}/on")
     public ResponseDTO<Map<String, Object>> turnOnDevice(@PathVariable Long id) {
-        return plcDeviceRepository.findById(id)
-                .map(device -> {
-                    boolean success = plcControlService.writeCoil(device, true);
-                    return ResponseDTO.success(Map.of(
-                            "deviceCode", device.getDeviceCode(),
-                            "success", success,
-                            "status", success ? "已开启" : "开启失败"
-                    ));
-                })
-                .orElse(ResponseDTO.error("设备不存在"));
+        PlcDevice device = plcDeviceRepository.selectById(id);
+        if (device == null) {
+            return ResponseDTO.error("设备不存在");
+        }
+        boolean success = plcControlService.writeCoil(device, true);
+        return ResponseDTO.success(Map.of(
+                "deviceCode", device.getDeviceCode(),
+                "success", success,
+                "status", success ? "已开启" : "开启失败"
+        ));
     }
 
     @PostMapping("/{id}/off")
     public ResponseDTO<Map<String, Object>> turnOffDevice(@PathVariable Long id) {
-        return plcDeviceRepository.findById(id)
-                .map(device -> {
-                    boolean success = plcControlService.writeCoil(device, false);
-                    return ResponseDTO.success(Map.of(
-                            "deviceCode", device.getDeviceCode(),
-                            "success", success,
-                            "status", success ? "已关闭" : "关闭失败"
-                    ));
-                })
-                .orElse(ResponseDTO.error("设备不存在"));
+        PlcDevice device = plcDeviceRepository.selectById(id);
+        if (device == null) {
+            return ResponseDTO.error("设备不存在");
+        }
+        boolean success = plcControlService.writeCoil(device, false);
+        return ResponseDTO.success(Map.of(
+                "deviceCode", device.getDeviceCode(),
+                "success", success,
+                "status", success ? "已关闭" : "关闭失败"
+        ));
     }
 
     @GetMapping("/{id}/status")
     public ResponseDTO<Map<String, Object>> getDeviceStatus(@PathVariable Long id) {
-        return plcDeviceRepository.findById(id)
-                .map(device -> {
-                    boolean status = plcControlService.readCoil(device);
-                    int value = plcControlService.readRegister(device);
-                    return ResponseDTO.success(Map.of(
-                            "deviceCode", device.getDeviceCode(),
-                            "coilStatus", status,
-                            "registerValue", value,
-                            "deviceStatus", device.getStatus()
-                    ));
-                })
-                .orElse(ResponseDTO.error("设备不存在"));
+        PlcDevice device = plcDeviceRepository.selectById(id);
+        if (device == null) {
+            return ResponseDTO.error("设备不存在");
+        }
+        boolean status = plcControlService.readCoil(device);
+        int value = plcControlService.readRegister(device);
+        return ResponseDTO.success(Map.of(
+                "deviceCode", device.getDeviceCode(),
+                "coilStatus", status,
+                "registerValue", value,
+                "deviceStatus", device.getStatus()
+        ));
     }
 
     @GetMapping("/statistics")
     public ResponseDTO<Map<String, Object>> getDeviceStatistics() {
-        long total = plcDeviceRepository.count();
-        long enabledCount = plcDeviceRepository.findByEnabled(true).size();
-        long onlineCount = plcDeviceRepository.findByStatus(1).size();
-        long offlineCount = plcDeviceRepository.findByStatus(0).size();
-        long faultCount = plcDeviceRepository.findByStatus(2).size();
+        long total = plcDeviceRepository.selectCount(null);
+        long enabledCount = plcDeviceRepository.selectCount(new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getEnabled, true));
+        long onlineCount = plcDeviceRepository.selectCount(new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getStatus, 1));
+        long offlineCount = plcDeviceRepository.selectCount(new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getStatus, 0));
+        long faultCount = plcDeviceRepository.selectCount(new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getStatus, 2));
 
         return ResponseDTO.success(Map.of(
                 "total", total,

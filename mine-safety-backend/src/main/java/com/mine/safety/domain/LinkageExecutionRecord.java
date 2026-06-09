@@ -1,12 +1,15 @@
 package com.mine.safety.domain;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -15,85 +18,71 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "linkage_execution_records")
+@TableName(value = "linkage_execution_records", autoResultMap = true)
 public class LinkageExecutionRecord {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "execution_no", length = 64, nullable = false, unique = true)
+    @TableField("execution_no")
     private String executionNo;
 
-    @Column(name = "rule_id")
+    @TableField("rule_id")
     private Long ruleId;
 
-    @Column(name = "rule_code", length = 64)
+    @TableField("rule_code")
     private String ruleCode;
 
-    @Column(name = "alert_id")
+    @TableField("alert_id")
     private Long alertId;
 
-    @Column(name = "action_id", nullable = false)
+    @TableField("action_id")
     private Long actionId;
 
-    @Column(name = "action_code", length = 64, nullable = false)
+    @TableField("action_code")
     private String actionCode;
 
-    @Column(name = "action_type", length = 32, nullable = false)
+    @TableField("action_type")
     private String actionType;
 
-    @Column(name = "target_type", length = 32)
+    @TableField("target_type")
     private String targetType;
 
-    @Column(name = "target_code", length = 64)
+    @TableField("target_code")
     private String targetCode;
 
-    @Column(name = "action_params", columnDefinition = "JSON")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @TableField(value = "action_params", typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> actionParams;
 
-    @Column(name = "request_payload", columnDefinition = "TEXT")
+    @TableField("request_payload")
     private String requestPayload;
 
-    @Column(name = "response_payload", columnDefinition = "TEXT")
+    @TableField("response_payload")
     private String responsePayload;
 
-    @Column(name = "status")
-    private Integer status;
+    @TableField("status")
+    private Integer status = 0;
 
-    @Column(name = "retry_count")
-    private Integer retryCount;
+    @TableField("retry_count")
+    private Integer retryCount = 0;
 
-    @Column(name = "execution_start_time")
+    @TableField("execution_start_time")
     private LocalDateTime executionStartTime;
 
-    @Column(name = "execution_end_time")
+    @TableField("execution_end_time")
     private LocalDateTime executionEndTime;
 
-    @Column(name = "duration_ms")
+    @TableField("duration_ms")
     private Long durationMs;
 
-    @Column(name = "error_msg", length = 1024)
+    @TableField("error_msg")
     private String errorMsg;
 
-    @Column(name = "operator", length = 64)
+    @TableField("operator")
     private String operator;
 
-    @Column(name = "created_at")
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        if (status == null) {
-            status = 0;
-        }
-        if (retryCount == null) {
-            retryCount = 0;
-        }
-    }
 
     public enum Status {
         PENDING(0, "待执行"),

@@ -8,16 +8,12 @@ import com.mine.safety.service.AlertLifecycleService;
 import com.mine.safety.service.AlertSearchService;
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -104,7 +100,7 @@ public class AlertLifecycleController {
     }
 
     @GetMapping
-    public ApiResponse<Page<Alert>> searchAlerts(
+    public ApiResponse<IPage<Alert>> searchAlerts(
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String level,
             @RequestParam(required = false) String sensorId,
@@ -112,9 +108,9 @@ public class AlertLifecycleController {
             @RequestParam(required = false) String sensorType,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Page<Alert> result = alertLifecycleService.searchAlerts(
+        IPage<Alert> result = alertLifecycleService.searchAlerts(
                 status, level, sensorId, tunnel, sensorType, startTime, endTime, page, size);
         return ApiResponse.success(result);
     }
@@ -141,7 +137,7 @@ public class AlertLifecycleController {
     }
 
     @GetMapping("/es/search")
-    public ApiResponse<Page<Map<String, Object>>> esSearch(
+    public ApiResponse<IPage<Map<String, Object>>> esSearch(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String level,
             @RequestParam(required = false) String tunnel,
@@ -149,14 +145,13 @@ public class AlertLifecycleController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
-            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         if (alertSearchService == null) {
             return ApiResponse.error("Elasticsearch未启用，请使用数据库查询接口");
         }
-        Pageable pageable = PageRequest.of(page, size);
         return ApiResponse.success(alertSearchService.searchAlerts(
-                keyword, level, tunnel, sensorType, status, startTime, endTime, pageable));
+                keyword, level, tunnel, sensorType, status, startTime, endTime, page, size));
     }
 
     @PostMapping("/es/reindex")

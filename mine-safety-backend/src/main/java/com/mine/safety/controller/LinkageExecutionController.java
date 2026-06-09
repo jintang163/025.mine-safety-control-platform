@@ -5,9 +5,9 @@ import com.mine.safety.dto.ResponseDTO;
 import com.mine.safety.repository.LinkageExecutionRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,46 +26,54 @@ public class LinkageExecutionController {
     private final LinkageExecutionRecordRepository executionRecordRepository;
 
     @GetMapping
-    public ResponseDTO<Page<LinkageExecutionRecord>> getExecutions(
+    public ResponseDTO<IPage<LinkageExecutionRecord>> getExecutions(
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
-            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable) {
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        Page<LinkageExecutionRecord> page;
+        IPage<LinkageExecutionRecord> result;
         if (startTime != null && endTime != null) {
-            page = executionRecordRepository.findByTimeRange(startTime, endTime, pageable);
+            result = executionRecordRepository.selectPage(new Page<>(page, size),
+                    new LambdaQueryWrapper<LinkageExecutionRecord>().between(LinkageExecutionRecord::getCreatedAt, startTime, endTime));
         } else {
-            page = executionRecordRepository.findAll(pageable);
+            result = executionRecordRepository.selectPage(new Page<>(page, size), null);
         }
-        return ResponseDTO.success(page);
+        return ResponseDTO.success(result);
     }
 
     @GetMapping("/alert/{alertId}")
     public ResponseDTO<List<LinkageExecutionRecord>> getExecutionsByAlertId(@PathVariable Long alertId) {
-        List<LinkageExecutionRecord>> records = executionRecordRepository.findByAlertId(alertId);
+        List<LinkageExecutionRecord> records = executionRecordRepository.selectList(
+                new LambdaQueryWrapper<LinkageExecutionRecord>().eq(LinkageExecutionRecord::getAlertId, alertId));
         return ResponseDTO.success(records);
     }
 
     @GetMapping("/rule/{ruleId}")
     public ResponseDTO<List<LinkageExecutionRecord>> getExecutionsByRuleId(@PathVariable Long ruleId) {
-        return ResponseDTO.success(executionRecordRepository.findByRuleId(ruleId));
+        return ResponseDTO.success(executionRecordRepository.selectList(
+                new LambdaQueryWrapper<LinkageExecutionRecord>().eq(LinkageExecutionRecord::getRuleId, ruleId)));
     }
 
     @GetMapping("/action/{actionId}")
     public ResponseDTO<List<LinkageExecutionRecord>> getExecutionsByActionId(@PathVariable Long actionId) {
-        return ResponseDTO.success(executionRecordRepository.findByActionId(actionId));
+        return ResponseDTO.success(executionRecordRepository.selectList(
+                new LambdaQueryWrapper<LinkageExecutionRecord>().eq(LinkageExecutionRecord::getActionId, actionId)));
     }
 
     @GetMapping("/status/{status}")
     public ResponseDTO<List<LinkageExecutionRecord>> getExecutionsByStatus(@PathVariable Integer status) {
-        return ResponseDTO.success(executionRecordRepository.findByStatus(status));
+        return ResponseDTO.success(executionRecordRepository.selectList(
+                new LambdaQueryWrapper<LinkageExecutionRecord>().eq(LinkageExecutionRecord::getStatus, status)));
     }
 
     @GetMapping("/{id}")
-    public ResponseDTO<LinkageExecutionRecord>> getExecutionById(@PathVariable Long id) {
-        return executionRecordRepository.findById(id)
-                .map(ResponseDTO::success)
-                .orElse(ResponseDTO.error("记录不存在"));
+    public ResponseDTO<LinkageExecutionRecord> getExecutionById(@PathVariable Long id) {
+        LinkageExecutionRecord record = executionRecordRepository.selectById(id);
+        if (record == null) {
+            return ResponseDTO.error("记录不存在");
+        }
+        return ResponseDTO.success(record);
     }
 
     @GetMapping("/statistics")
@@ -107,14 +115,14 @@ public class LinkageExecutionController {
 
     @GetMapping("/retry/{id}")
     public ResponseDTO<Map<String, Object>> retryExecution(@PathVariable Long id) {
-        return executionRecordRepository.findById(id)
-                .map(record -> {
-                    log.info("重试执行记录 - ID: {}", id);
-                    return ResponseDTO.success(Map.of(
-                            "message", "重试成功",
-                            "executionId", id
-                    ));
-                })
-                .orElse(ResponseDTO.error("记录不存在"));
+        LinkageExecutionRecord record = executionRecordRepository.selectById(id);
+        if (record == null) {
+            return ResponseDTO.error("记录不存在");
+        }
+        log.info("重试执行记录 - ID: {}", id);
+        return ResponseDTO.success(Map.of(
+                "message", "重试成功",
+                "executionId", id
+        ));
     }
 }

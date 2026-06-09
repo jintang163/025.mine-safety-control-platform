@@ -1,5 +1,6 @@
 package com.mine.safety.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.domain.SensorData;
 import com.mine.safety.dto.SensorDataDTO;
@@ -96,7 +97,8 @@ public class SensorDataService {
         BigDecimal value = dto.getValue();
 
         // 1. 验证传感器配置
-        Sensor sensor = sensorRepository.findBySensorId(sensorId).orElse(null);
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, sensorId));
         if (sensor == null) {
             log.warn("未找到传感器配置: {}", sensorId);
             dto.setQuality(0);
@@ -225,7 +227,7 @@ public class SensorDataService {
             sensorData.setTimestamp(dto.getTimestamp());
             sensorData.setLocation(dto.getLocation());
             sensorData.setQuality(dto.getQuality());
-            sensorDataRepository.save(sensorData);
+            sensorDataRepository.insert(sensorData);
         } catch (Exception e) {
             log.error("保存传感器数据到MySQL失败: {}", e.getMessage());
         }

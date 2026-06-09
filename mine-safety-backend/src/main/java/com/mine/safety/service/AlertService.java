@@ -1,6 +1,7 @@
 package com.mine.safety.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mine.safety.domain.Alert;
 import com.mine.safety.domain.AlertRule;
 import com.mine.safety.domain.Sensor;
@@ -430,7 +431,8 @@ public class AlertService {
         }
 
         // 查询传感器信息
-        Sensor sensor = sensorRepository.findBySensorId(sensorId).orElse(null);
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, sensorId));
 
         // 创建新报警记录
         Alert alert = new Alert();
@@ -451,7 +453,7 @@ public class AlertService {
         alert.setLastAlertTime(dto.getTimestamp());
         alert.setAlertCount(1);
 
-        alert = alertRepository.save(alert);
+        alertRepository.insert(alert);
 
         addToUnconfirmedQueue(alert.getAlertNo(), alert.getLevel());
 
@@ -516,7 +518,7 @@ public class AlertService {
         alert.setLastAlertTime(dto.getTimestamp());
         alert.setAlertCount(1);
 
-        alert = alertRepository.save(alert);
+        alertRepository.insert(alert);
 
         addToUnconfirmedQueue(alert.getAlertNo(), alertLevel);
 
@@ -777,16 +779,28 @@ public class AlertService {
     /**
      * 确认报警（处理报警）
      *
+     * @deprecated 请使用 {@link AlertLifecycleService#confirmAlert(String, String)} 代替
      * @param alertNo  报警编号
      * @param status   新状态
      * @param operator 操作人
      * @param comment  处理备注
      * @return 更新后的报警实体
      */
+    @Deprecated
     @Transactional
     public Alert acknowledgeAlert(String alertNo, Integer status, String operator, String comment) {
-        Alert alert = alertRepository.findByAlertNo(alertNo)
-                .orElseThrow(() -> new RuntimeException("报警不存在: " + alertNo));
+        log.warn("[已废弃] acknowledgeAlert 方法已废弃，请使用 AlertLifecycleService.confirmAlert() 代替 - 报警编号: {}", alertNo);
+
+        Alert alert = alertRepository.selectOne(
+                new LambdaQueryWrapper<Alert>().eq(Alert::getAlertNo, alertNo));
+        if (alert == null) {
+            throw new RuntimeException("报警不存在: " + alertNo);
+        }
+
+        if (alert.getStatus().equals(Alert.AlertStatus.PENDING.getValue())
+                && !status.equals(Alert.AlertStatus.CONFIRMED.getValue())) {
+            throw new RuntimeException("PENDING状态的报警必须先确认为CONFIRMED，请使用 AlertLifecycleService.confirmAlert()");
+        }
 
         alert.setStatus(status);
         alert.setAcknowledgedBy(operator);
@@ -795,7 +809,8 @@ public class AlertService {
 
         removeFromUnconfirmedQueue(alertNo);
 
-        return alertRepository.save(alert);
+        alertRepository.updateById(alert);
+        return alert;
     }
 
     private void addToUnconfirmedQueue(String alertNo, String level) {

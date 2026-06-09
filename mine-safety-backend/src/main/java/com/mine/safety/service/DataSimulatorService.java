@@ -1,5 +1,6 @@
 package com.mine.safety.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.alibaba.fastjson2.JSON;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.dto.SensorDataDTO;
@@ -235,7 +236,8 @@ public class DataSimulatorService {
                 config.setVariance(yamlConfig.getVariance());
 
                 // 从数据库读取采样间隔，如果不存在则根据类型使用默认值
-                Sensor sensor = sensorRepository.findBySensorId(yamlConfig.getId()).orElse(null);
+                Sensor sensor = sensorRepository.selectOne(
+                        new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, yamlConfig.getId()));
                 if (sensor != null && sensor.getSamplingInterval() != null) {
                     config.setSamplingInterval(sensor.getSamplingInterval());
                     config.setName(sensor.getName());
@@ -254,7 +256,7 @@ public class DataSimulatorService {
         }
 
         // 2. 从数据库加载所有传感器
-        List<Sensor> sensors = sensorRepository.findAll();
+        List<Sensor> sensors = sensorRepository.selectList(null);
         for (Sensor sensor : sensors) {
             // 只处理启用的传感器
             if (sensor.getStatus() == null || sensor.getStatus() == 0) {

@@ -1,6 +1,7 @@
 package com.mine.safety.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.domain.SensorData;
 import com.mine.safety.dto.SensorDTO;
@@ -9,8 +10,6 @@ import com.mine.safety.repository.SensorDataRepository;
 import com.mine.safety.repository.SensorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -66,7 +65,7 @@ public class SensorService {
      * @return 所有传感器DTO列表
      */
     public List<SensorDTO> getAllSensors() {
-        return sensorRepository.findAll().stream()
+        return sensorRepository.selectList(null).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -78,7 +77,7 @@ public class SensorService {
      * @return 该类型的传感器列表
      */
     public List<SensorDTO> getSensorsByType(String type) {
-        return sensorRepository.findByType(type).stream()
+        return sensorRepository.selectList(new LambdaQueryWrapper<Sensor>().eq(Sensor::getType, type)).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -90,7 +89,7 @@ public class SensorService {
      * @return 该状态的传感器列表
      */
     public List<SensorDTO> getSensorsByStatus(Integer status) {
-        return sensorRepository.findByStatus(status).stream()
+        return sensorRepository.selectList(new LambdaQueryWrapper<Sensor>().eq(Sensor::getStatus, status)).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -102,7 +101,7 @@ public class SensorService {
      * @return 该区域的传感器列表
      */
     public List<SensorDTO> getSensorsByZone(String zoneCode) {
-        return sensorRepository.findByZoneCode(zoneCode).stream()
+        return sensorRepository.selectList(new LambdaQueryWrapper<Sensor>().eq(Sensor::getZoneCode, zoneCode)).stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -115,9 +114,12 @@ public class SensorService {
      * @throws RuntimeException 传感器不存在时抛出
      */
     public SensorDTO getSensorById(String sensorId) {
-        return sensorRepository.findBySensorId(sensorId)
-                .map(this::convertToDTO)
-                .orElseThrow(() -> new RuntimeException("传感器不存在: " + sensorId));
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, sensorId));
+        if (sensor == null) {
+            throw new RuntimeException("传感器不存在: " + sensorId);
+        }
+        return convertToDTO(sensor);
     }
 
     /**
@@ -129,7 +131,7 @@ public class SensorService {
      */
     @Transactional
     public SensorDTO createSensor(SensorDTO dto) {
-        if (sensorRepository.existsBySensorId(dto.getSensorId())) {
+        if (sensorRepository.selectCount(new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, dto.getSensorId())) > 0) {
             throw new RuntimeException("传感器ID已存在: " + dto.getSensorId());
         }
 
@@ -152,7 +154,7 @@ public class SensorService {
         sensor.setPowerOffThreshold(dto.getPowerOffThreshold());
         sensor.setZoneCode(dto.getZoneCode());
 
-        sensor = sensorRepository.save(sensor);
+        sensor = sensorRepository.insert(sensor);
         return convertToDTO(sensor);
     }
 
@@ -167,8 +169,11 @@ public class SensorService {
      */
     @Transactional
     public SensorDTO updateSensor(String sensorId, SensorDTO dto) {
-        Sensor sensor = sensorRepository.findBySensorId(sensorId)
-                .orElseThrow(() -> new RuntimeException("传感器不存在: " + sensorId));
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, sensorId));
+        if (sensor == null) {
+            throw new RuntimeException("传感器不存在: " + sensorId);
+        }
 
         if (dto.getName() != null) sensor.setName(dto.getName());
         if (dto.getType() != null) sensor.setType(dto.getType());
@@ -187,7 +192,7 @@ public class SensorService {
         if (dto.getPowerOffThreshold() != null) sensor.setPowerOffThreshold(dto.getPowerOffThreshold());
         if (dto.getZoneCode() != null) sensor.setZoneCode(dto.getZoneCode());
 
-        sensor = sensorRepository.save(sensor);
+        sensor = sensorRepository.updateById(sensor);
         return convertToDTO(sensor);
     }
 
@@ -199,9 +204,12 @@ public class SensorService {
      */
     @Transactional
     public void deleteSensor(String sensorId) {
-        Sensor sensor = sensorRepository.findBySensorId(sensorId)
-                .orElseThrow(() -> new RuntimeException("传感器不存在: " + sensorId));
-        sensorRepository.delete(sensor);
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, sensorId));
+        if (sensor == null) {
+            throw new RuntimeException("传感器不存在: " + sensorId);
+        }
+        sensorRepository.deleteById(sensor.getId());
     }
 
     /**
@@ -279,7 +287,7 @@ public class SensorService {
      * @return 所有传感器的最新数据列表
      */
     public List<SensorDataDTO> getAllLatestData() {
-        List<Sensor> sensors = sensorRepository.findAll();
+        List<Sensor> sensors = sensorRepository.selectList(null);
         List<SensorDataDTO> result = new ArrayList<>();
 
         for (Sensor sensor : sensors) {

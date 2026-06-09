@@ -1,43 +1,21 @@
 package com.mine.safety.repository;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.mine.safety.domain.AlertRuleDefinition;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
-import java.util.Optional;
 
-@Repository
-public interface AlertRuleDefinitionRepository extends JpaRepository<AlertRuleDefinition, Long> {
+@Mapper
+public interface AlertRuleDefinitionRepository extends BaseMapper<AlertRuleDefinition> {
 
-    Optional<AlertRuleDefinition> findByRuleCode(String ruleCode);
+    @Select("SELECT * FROM alert_rule_definitions WHERE enabled = true AND (sensor_type = #{sensorType} OR sensor_type IS NULL) AND (sensor_id = #{sensorId} OR sensor_id IS NULL) AND (zone_code = #{zoneCode} OR zone_code IS NULL) ORDER BY CASE rule_type WHEN 'COMPOUND' THEN 1 WHEN 'TREND' THEN 2 WHEN 'SINGLE_THRESHOLD' THEN 3 END, level DESC")
+    List<AlertRuleDefinition> findMatchingRules(@Param("sensorType") String sensorType,
+                                                @Param("sensorId") String sensorId,
+                                                @Param("zoneCode") String zoneCode);
 
-    List<AlertRuleDefinition> findByEnabled(Boolean enabled);
-
-    List<AlertRuleDefinition> findByRuleTypeAndEnabled(String ruleType, Boolean enabled);
-
-    List<AlertRuleDefinition> findBySensorTypeAndEnabled(String sensorType, Boolean enabled);
-
-    List<AlertRuleDefinition> findByZoneCodeAndEnabled(String zoneCode, Boolean enabled);
-
-    @Query("SELECT r FROM AlertRuleDefinition r WHERE r.enabled = true " +
-           "AND (r.sensorType = :sensorType OR r.sensorType IS NULL) " +
-           "AND (r.sensorId = :sensorId OR r.sensorId IS NULL) " +
-           "AND (r.zoneCode = :zoneCode OR r.zoneCode IS NULL) " +
-           "ORDER BY CASE r.ruleType " +
-           "    WHEN 'COMPOUND' THEN 1 " +
-           "    WHEN 'TREND' THEN 2 " +
-           "    WHEN 'SINGLE_THRESHOLD' THEN 3 " +
-           "END, r.level DESC")
-    List<AlertRuleDefinition> findMatchingRules(
-            @Param("sensorType") String sensorType,
-            @Param("sensorId") String sensorId,
-            @Param("zoneCode") String zoneCode);
-
-    @Query("SELECT r.ruleCode FROM AlertRuleDefinition r WHERE r.enabled = true")
+    @Select("SELECT rule_code FROM alert_rule_definitions WHERE enabled = true")
     List<String> findAllEnabledRuleCodes();
-
-    boolean existsByRuleCode(String ruleCode);
 }

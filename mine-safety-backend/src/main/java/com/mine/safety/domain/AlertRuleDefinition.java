@@ -1,12 +1,15 @@
 package com.mine.safety.domain;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -15,82 +18,62 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Entity
-@Table(name = "alert_rule_definitions")
+@TableName(value = "alert_rule_definitions", autoResultMap = true)
 public class AlertRuleDefinition {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "rule_code", length = 64, nullable = false, unique = true)
+    @TableField("rule_code")
     private String ruleCode;
 
-    @Column(name = "rule_name", length = 128, nullable = false)
+    @TableField("rule_name")
     private String ruleName;
 
-    @Column(name = "rule_type", length = 32, nullable = false)
+    @TableField("rule_type")
     private String ruleType;
 
-    @Column(name = "sensor_type", length = 32)
+    @TableField("sensor_type")
     private String sensorType;
 
-    @Column(name = "sensor_id", length = 64)
+    @TableField("sensor_id")
     private String sensorId;
 
-    @Column(name = "zone_code", length = 32)
+    @TableField("zone_code")
     private String zoneCode;
 
-    @Column(name = "drools_rule", columnDefinition = "TEXT")
+    @TableField("drools_rule")
     private String droolsRule;
 
-    @Column(name = "groovy_script", columnDefinition = "TEXT")
+    @TableField("groovy_script")
     private String groovyScript;
 
-    @Column(name = "rule_params", columnDefinition = "JSON")
-    @JdbcTypeCode(SqlTypes.JSON)
+    @TableField(value = "rule_params", typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> ruleParams;
 
-    @Column(name = "level", length = 16, nullable = false)
+    @TableField("level")
     private String level;
 
-    @Column(name = "description", length = 512)
+    @TableField("description")
     private String description;
 
-    @Column(name = "enabled")
-    private Boolean enabled;
+    @TableField("enabled")
+    private Boolean enabled = true;
 
-    @Column(name = "version")
-    private Integer version;
+    @TableField("version")
+    private Integer version = 1;
 
-    @Column(name = "created_by", length = 64)
+    @TableField("created_by")
     private String createdBy;
 
-    @Column(name = "created_at")
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_by", length = 64)
+    @TableField("updated_by")
     private String updatedBy;
 
-    @Column(name = "updated_at")
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (enabled == null) {
-            enabled = true;
-        }
-        if (version == null) {
-            version = 1;
-        }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 
     public enum RuleType {
         SINGLE_THRESHOLD, TREND, COMPOUND

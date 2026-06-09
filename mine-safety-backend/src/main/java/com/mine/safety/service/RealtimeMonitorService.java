@@ -1,5 +1,6 @@
 package com.mine.safety.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.dto.RealtimeMonitorDTO;
 import com.mine.safety.dto.SensorDataDTO;
@@ -33,8 +34,11 @@ public class RealtimeMonitorService {
     }
 
     public RealtimeMonitorDTO getChannelMonitor(String sensorId) {
-        Sensor sensor = sensorRepository.findBySensorId(sensorId)
-                .orElseThrow(() -> new RuntimeException("传感器不存在: " + sensorId));
+        Sensor sensor = sensorRepository.selectOne(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getSensorId, sensorId));
+        if (sensor == null) {
+            throw new RuntimeException("传感器不存在: " + sensorId);
+        }
 
         SensorDataDTO latestData = latestSensorData.get(sensorId);
         if (latestData == null) {
@@ -45,7 +49,8 @@ public class RealtimeMonitorService {
     }
 
     public RealtimeMonitorDTO.ZoneMonitorDTO getZoneMonitor(String zoneCode) {
-        List<Sensor> sensors = sensorRepository.findByZoneCode(zoneCode);
+        List<Sensor> sensors = sensorRepository.selectList(
+                new LambdaQueryWrapper<Sensor>().eq(Sensor::getZoneCode, zoneCode));
 
         List<RealtimeMonitorDTO> sensorMonitors = new ArrayList<>();
         int alertCount = 0, warningCount = 0, emergencyCount = 0;
@@ -76,7 +81,7 @@ public class RealtimeMonitorService {
     }
 
     public RealtimeMonitorDTO.MineMonitorDTO getMineMonitor() {
-        List<Sensor> allSensors = sensorRepository.findAll();
+        List<Sensor> allSensors = sensorRepository.selectList(null);
         Map<String, List<Sensor>> zoneSensorMap = allSensors.stream()
                 .filter(s -> s.getZoneCode() != null)
                 .collect(Collectors.groupingBy(Sensor::getZoneCode));
@@ -119,7 +124,7 @@ public class RealtimeMonitorService {
             RealtimeMonitorDTO.MineMonitorDTO monitorData = getMineMonitor();
             webSocketPushService.pushRealtimeMonitor(monitorData);
 
-            Map<String, List<Sensor>> zoneSensorMap = sensorRepository.findAll().stream()
+            Map<String, List<Sensor>> zoneSensorMap = sensorRepository.selectList(null).stream()
                     .filter(s -> s.getZoneCode() != null)
                     .collect(Collectors.groupingBy(Sensor::getZoneCode));
 

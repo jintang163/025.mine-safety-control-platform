@@ -207,7 +207,7 @@ public class LinkageActionEngineService {
                 .operator("SYSTEM")
                 .build();
 
-        return executionRecordRepository.save(record);
+        return executionRecordRepository.insert(record);
     }
 
     private String buildRequestPayload(LinkageAction action, RuleSensorData ruleData, AlertDTO alert) {
@@ -235,7 +235,7 @@ public class LinkageActionEngineService {
         if (errorMsg != null) {
             record.setErrorMsg(errorMsg);
         }
-        executionRecordRepository.save(record);
+        executionRecordRepository.updateById(record);
     }
 
     private ActionResult triggerVideoPopup(String targetZone, Map<String, Object> params) {

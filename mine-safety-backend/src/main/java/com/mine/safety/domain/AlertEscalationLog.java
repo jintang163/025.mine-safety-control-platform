@@ -1,42 +1,39 @@
 package com.mine.safety.domain;
 
-import jakarta.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
 @Data
-@Entity
-@Table(name = "alert_escalation_logs", indexes = {
-        @Index(name = "idx_esca_alert_no", columnList = "alert_no"),
-        @Index(name = "idx_esca_level", columnList = "from_level")
-})
+@TableName("alert_escalation_logs")
 public class AlertEscalationLog {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
-    @Column(name = "alert_no", nullable = false, length = 64)
+    @TableField("alert_no")
     private String alertNo;
 
-    @Column(name = "from_level", nullable = false, length = 16)
+    @TableField("from_level")
     private String fromLevel;
 
-    @Column(name = "to_level", nullable = false, length = 16)
+    @TableField("to_level")
     private String toLevel;
 
-    @Column(name = "escalation_reason", length = 256)
+    @TableField("escalation_reason")
     private String escalationReason;
 
-    @Column(name = "notified_users", length = 512)
+    @TableField("notified_users")
     private String notifiedUsers;
 
-    @Column(name = "notification_channels", length = 256)
+    @TableField("notification_channels")
     private String notificationChannels;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }
