@@ -26,153 +26,119 @@ import java.time.LocalDateTime;
         @Index(name = "idx_sensor_id", columnList = "sensor_id"),
         @Index(name = "idx_status", columnList = "status"),
         @Index(name = "idx_level", columnList = "level"),
-        @Index(name = "idx_alert_time", columnList = "first_alert_time")
+        @Index(name = "idx_alert_time", columnList = "first_alert_time"),
+        @Index(name = "idx_escalation_level", columnList = "escalation_level"),
+        @Index(name = "idx_tunnel", columnList = "tunnel"),
+        @Index(name = "idx_threshold_type", columnList = "threshold_type")
 })
 public class Alert {
 
-    /**
-     * 主键ID（自增）
-     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * 报警编号，业务主键
-     * 格式：ALT + yyyyMMddHHmmss + 8位随机字符串
-     */
     @Column(name = "alert_no", nullable = false, unique = true, length = 64)
     private String alertNo;
 
-    /**
-     * 关联的传感器ID
-     */
     @Column(name = "sensor_id", nullable = false, length = 64)
     private String sensorId;
 
-    /**
-     * 传感器名称（冗余，便于查询）
-     */
     @Column(name = "sensor_name", length = 128)
     private String sensorName;
 
-    /**
-     * 传感器类型（冗余，便于统计）
-     */
     @Column(name = "sensor_type", length = 32)
     private String sensorType;
 
-    /**
-     * 报警位置（冗余，便于展示）
-     */
     @Column(length = 256)
     private String location;
 
-    /**
-     * 触发报警时的传感器数值
-     */
+    @Column(name = "tunnel", length = 128)
+    private String tunnel;
+
     @Column(name = "alert_value", nullable = false, precision = 12, scale = 4)
     private BigDecimal alertValue;
 
-    /**
-     * 报警阈值（规则配置的阈值）
-     */
     @Column(name = "threshold_value", precision = 12, scale = 4)
     private BigDecimal thresholdValue;
 
-    /**
-     * 报警级别
-     * INFO(提示)、WARNING(预警)、ALERT(报警)、EMERGENCY(紧急)
-     */
+    @Column(name = "threshold_type", length = 32)
+    private String thresholdType;
+
     @Column(nullable = false, length = 16)
     private String level;
 
-    /**
-     * 关联的报警规则ID
-     */
     @Column(name = "rule_id")
     private Long ruleId;
 
-    /**
-     * 规则名称（冗余，便于展示）
-     */
     @Column(name = "rule_name", length = 128)
     private String ruleName;
 
-    /**
-     * 报警描述
-     */
     @Column(length = 512)
     private String description;
 
-    /**
-     * 处理状态
-     * 0-未处理，1-处理中，2-已处理，3-已忽略
-     */
     private Integer status = 0;
 
-    /**
-     * 确认人（处理人）
-     */
+    @Column(name = "escalation_level", length = 16)
+    private String escalationLevel;
+
+    @Column(name = "escalation_time")
+    private LocalDateTime escalationTime;
+
+    @Column(name = "confirmed_by", length = 64)
+    private String confirmedBy;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
+    @Column(name = "processing_by", length = 64)
+    private String processingBy;
+
+    @Column(name = "processing_at")
+    private LocalDateTime processingAt;
+
+    @Column(name = "recovered_at")
+    private LocalDateTime recoveredAt;
+
+    @Column(name = "closed_by", length = 64)
+    private String closedBy;
+
+    @Column(name = "closed_at")
+    private LocalDateTime closedAt;
+
     @Column(name = "acknowledged_by", length = 64)
     private String acknowledgedBy;
 
-    /**
-     * 确认时间
-     */
     @Column(name = "acknowledged_at")
     private LocalDateTime acknowledgedAt;
 
-    /**
-     * 处理备注
-     */
     @Column(name = "acknowledged_comment", length = 512)
     private String acknowledgedComment;
 
-    /**
-     * 首次报警时间
-     */
     @Column(name = "first_alert_time", nullable = false)
     private LocalDateTime firstAlertTime;
 
-    /**
-     * 最后报警时间（用于统计频率）
-     */
     @Column(name = "last_alert_time", nullable = false)
     private LocalDateTime lastAlertTime;
 
-    /**
-     * 报警次数（同一规则重复触发时累加）
-     */
     @Column(name = "alert_count")
     private Integer alertCount = 1;
 
-    /**
-     * 创建时间
-     */
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    /**
-     * 更新时间
-     */
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    /**
-     * 报警状态枚举
-     */
     public enum AlertStatus {
-        /** 未处理 */
         PENDING(0),
-        /** 处理中 */
         PROCESSING(1),
-        /** 已处理 */
         RESOLVED(2),
-        /** 已忽略 */
-        IGNORED(3);
+        IGNORED(3),
+        CONFIRMED(4),
+        RECOVERED(5),
+        CLOSED(6);
 
         private final int value;
 
@@ -183,19 +149,43 @@ public class Alert {
         public int getValue() {
             return value;
         }
+
+        public static AlertStatus fromValue(int value) {
+            for (AlertStatus s : values()) {
+                if (s.value == value) return s;
+            }
+            throw new IllegalArgumentException("Unknown AlertStatus value: " + value);
+        }
     }
 
-    /**
-     * 报警级别枚举
-     */
+    public enum EscalationLevel {
+        DUTY("DUTY"),
+        SHIFT_LEADER("SHIFT_LEADER"),
+        MINE_MANAGER("MINE_MANAGER");
+
+        private final String value;
+
+        EscalationLevel(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public EscalationLevel next() {
+            return switch (this) {
+                case DUTY -> SHIFT_LEADER;
+                case SHIFT_LEADER -> MINE_MANAGER;
+                case MINE_MANAGER -> MINE_MANAGER;
+            };
+        }
+    }
+
     public enum AlertLevel {
-        /** 提示信息 */
         INFO,
-        /** 预警 */
         WARNING,
-        /** 报警 */
         ALERT,
-        /** 紧急报警 */
         EMERGENCY
     }
 }

@@ -446,13 +446,15 @@ public class AlertService {
         alert.setRuleName(rule.getRuleName());
         alert.setDescription(rule.getDescription());
         alert.setStatus(Alert.AlertStatus.PENDING.getValue());
+        alert.setEscalationLevel(Alert.EscalationLevel.DUTY.getValue());
         alert.setFirstAlertTime(dto.getTimestamp());
         alert.setLastAlertTime(dto.getTimestamp());
         alert.setAlertCount(1);
 
         alert = alertRepository.save(alert);
 
-        // 转换为DTO并设置通知渠道
+        addToUnconfirmedQueue(alert.getAlertNo(), alert.getLevel());
+
         AlertDTO alertDTO = convertToDTO(alert);
         alertDTO.setNotificationChannels(rule.getNotificationChannels());
 
@@ -509,11 +511,14 @@ public class AlertService {
         alert.setRuleName(ruleName);
         alert.setDescription(description);
         alert.setStatus(Alert.AlertStatus.PENDING.getValue());
+        alert.setEscalationLevel(Alert.EscalationLevel.DUTY.getValue());
         alert.setFirstAlertTime(dto.getTimestamp());
         alert.setLastAlertTime(dto.getTimestamp());
         alert.setAlertCount(1);
 
         alert = alertRepository.save(alert);
+
+        addToUnconfirmedQueue(alert.getAlertNo(), alertLevel);
 
         AlertDTO alertDTO = convertToDTO(alert);
         alertDTO.setNotificationChannels("SMS,EMAIL,VOICE,WEBHOOK");
@@ -788,7 +793,38 @@ public class AlertService {
         alert.setAcknowledgedAt(LocalDateTime.now());
         alert.setAcknowledgedComment(comment);
 
+        removeFromUnconfirmedQueue(alertNo);
+
         return alertRepository.save(alert);
+    }
+
+    private void addToUnconfirmedQueue(String alertNo, String level) {
+        try {
+            String key = "alert:lifecycle:" + alertNo;
+            Map<String, String> alertData = new HashMap<>();
+            alertData.put("alertNo", alertNo);
+            alertData.put("level", level);
+            alertData.put("triggerTime", LocalDateTime.now().toString());
+            alertData.put("escalationLevel", Alert.EscalationLevel.DUTY.getValue());
+
+            redisTemplate.opsForHash().putAll(key, alertData);
+            redisTemplate.expire(key, 24, TimeUnit.HOURS);
+
+            double score = System.currentTimeMillis();
+            redisTemplate.opsForZSet().add("alert:unconfirmed:queue", alertNo, score);
+        } catch (Exception e) {
+            log.warn("Redis操作失败，报警队列功能降级: {}", e.getMessage());
+        }
+    }
+
+    private void removeFromUnconfirmedQueue(String alertNo) {
+        try {
+            String key = "alert:lifecycle:" + alertNo;
+            redisTemplate.delete(key);
+            redisTemplate.opsForZSet().remove("alert:unconfirmed:queue", alertNo);
+        } catch (Exception e) {
+            log.warn("Redis操作失败: {}", e.getMessage());
+        }
     }
 
     /**

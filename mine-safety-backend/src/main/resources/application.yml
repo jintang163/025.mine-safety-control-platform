@@ -41,6 +41,15 @@ spring:
           min-idle: 0
           max-wait: -1
 
+    elasticsearch:
+      repositories:
+        enabled: true
+
+  elasticsearch:
+    uris: http://localhost:9200
+    connection-timeout: 5s
+    socket-timeout: 30s
+
   # 邮件发送配置（报警通知用）
   mail:
     host: smtp.163.com
@@ -121,8 +130,15 @@ app:
   alert:
     enabled: true
     cooldown-seconds: 30
+    escalation:
+      timeout-minutes: 2
+      enabled: true
+    lifecycle:
+      enabled: true
     sensor-threshold-check:
       enabled: true
+  elasticsearch:
+    enabled: false
   netty:
     websocket:
       enabled: true
