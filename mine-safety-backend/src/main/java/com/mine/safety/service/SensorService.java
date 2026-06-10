@@ -153,6 +153,11 @@ public class SensorService {
         sensor.setAlarmThreshold(dto.getAlarmThreshold());
         sensor.setPowerOffThreshold(dto.getPowerOffThreshold());
         sensor.setZoneCode(dto.getZoneCode());
+        sensor.setBatteryLevel(dto.getBatteryLevel() != null ? dto.getBatteryLevel() : 100);
+        sensor.setSignalStrength(dto.getSignalStrength() != null ? dto.getSignalStrength() : 0);
+        sensor.setDataUploadDelay(dto.getDataUploadDelay());
+        sensor.setOfflineTimeoutMinutes(dto.getOfflineTimeoutMinutes() != null ? dto.getOfflineTimeoutMinutes() : 10);
+        sensor.setCalibrationCycleDays(dto.getCalibrationCycleDays());
 
         sensor = sensorRepository.insert(sensor);
         return convertToDTO(sensor);
@@ -191,6 +196,11 @@ public class SensorService {
         if (dto.getAlarmThreshold() != null) sensor.setAlarmThreshold(dto.getAlarmThreshold());
         if (dto.getPowerOffThreshold() != null) sensor.setPowerOffThreshold(dto.getPowerOffThreshold());
         if (dto.getZoneCode() != null) sensor.setZoneCode(dto.getZoneCode());
+        if (dto.getBatteryLevel() != null) sensor.setBatteryLevel(dto.getBatteryLevel());
+        if (dto.getSignalStrength() != null) sensor.setSignalStrength(dto.getSignalStrength());
+        if (dto.getDataUploadDelay() != null) sensor.setDataUploadDelay(dto.getDataUploadDelay());
+        if (dto.getOfflineTimeoutMinutes() != null) sensor.setOfflineTimeoutMinutes(dto.getOfflineTimeoutMinutes());
+        if (dto.getCalibrationCycleDays() != null) sensor.setCalibrationCycleDays(dto.getCalibrationCycleDays());
 
         sensor = sensorRepository.updateById(sensor);
         return convertToDTO(sensor);
@@ -365,6 +375,15 @@ public class SensorService {
         dto.setZoneCode(sensor.getZoneCode());
         dto.setLastOnlineTime(sensor.getLastOnlineTime() != null ?
                 sensor.getLastOnlineTime().toString() : null);
+        dto.setBatteryLevel(sensor.getBatteryLevel());
+        dto.setSignalStrength(sensor.getSignalStrength());
+        dto.setDataUploadDelay(sensor.getDataUploadDelay());
+        dto.setOfflineTimeoutMinutes(sensor.getOfflineTimeoutMinutes());
+        dto.setCalibrationCycleDays(sensor.getCalibrationCycleDays());
+        dto.setLastCalibrationDate(sensor.getLastCalibrationDate() != null ?
+                sensor.getLastCalibrationDate().toString() : null);
+        dto.setNextCalibrationDate(sensor.getNextCalibrationDate() != null ?
+                sensor.getNextCalibrationDate().toString() : null);
         return dto;
     }
 

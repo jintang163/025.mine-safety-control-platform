@@ -130,4 +130,18 @@ public class SensorDTO {
      * 最后在线时间（字符串格式，用于返回前端）
      */
     private String lastOnlineTime;
+
+    private Integer batteryLevel;
+
+    private Integer signalStrength;
+
+    private Integer dataUploadDelay;
+
+    private Integer offlineTimeoutMinutes;
+
+    private Integer calibrationCycleDays;
+
+    private String lastCalibrationDate;
+
+    private String nextCalibrationDate;
 }

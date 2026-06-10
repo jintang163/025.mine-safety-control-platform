@@ -53,6 +53,27 @@ public class Sensor {
     @TableField("last_online_time")
     private LocalDateTime lastOnlineTime;
 
+    @TableField("battery_level")
+    private Integer batteryLevel;
+
+    @TableField("signal_strength")
+    private Integer signalStrength;
+
+    @TableField("data_upload_delay")
+    private Integer dataUploadDelay;
+
+    @TableField("offline_timeout_minutes")
+    private Integer offlineTimeoutMinutes;
+
+    @TableField("calibration_cycle_days")
+    private Integer calibrationCycleDays;
+
+    @TableField("last_calibration_date")
+    private java.time.LocalDate lastCalibrationDate;
+
+    @TableField("next_calibration_date")
+    private java.time.LocalDate nextCalibrationDate;
+
     @TableField("warning_threshold")
     private BigDecimal warningThreshold;
 

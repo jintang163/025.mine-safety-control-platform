@@ -298,6 +298,20 @@ app:
       secret-key: xxxxxxxxxx
       sign-name: 煤矿安全平台
 
+  fault-order:
+    enabled: true
+    work-order-api-url: ""
+    work-order-api-key: ""
+    notify-channels: SMS,APP
+    offline-timeout-minutes: 10
+    low-battery-threshold: 20
+    calibration-expiring-days: 30
+
+  device-shadow:
+    enabled: true
+    mqtt-desired-topic-prefix: mine/shadow/desired/
+    mqtt-reported-topic-prefix: mine/shadow/reported/
+
 logging:
   level:
     root: INFO

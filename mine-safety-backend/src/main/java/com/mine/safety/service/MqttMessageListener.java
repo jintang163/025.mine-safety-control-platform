@@ -1,6 +1,7 @@
 package com.mine.safety.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.mine.safety.config.MqttConfig;
 import com.mine.safety.dto.SensorDataDTO;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * MQTT消息监听器
@@ -44,6 +46,9 @@ public class MqttMessageListener implements MqttCallback {
      * Kafka消息生产者服务，用于转发传感器数据到Kafka
      */
     private final KafkaProducerService kafkaProducerService;
+
+    @Lazy
+    private final DeviceShadowService deviceShadowService;
 
     /**
      * 连接丢失回调
@@ -83,8 +88,9 @@ public class MqttMessageListener implements MqttCallback {
                 // 命令响应：mine/command/response/{sensorId}
                 handleCommandResponse(topic, payload);
             } else if (topic.startsWith("mine/system/status/")) {
-                // 系统状态通知
                 handleSystemStatus(topic, payload);
+            } else if (topic.startsWith("mine/shadow/reported/")) {
+                handleDeviceShadowReported(topic, payload);
             } else {
                 log.debug("未匹配到主题处理器 - 主题: {}", topic);
             }
@@ -221,6 +227,23 @@ public class MqttMessageListener implements MqttCallback {
 
         } catch (Exception e) {
             log.error("处理系统状态消息失败: {}", e.getMessage());
+        }
+    }
+
+    private void handleDeviceShadowReported(String topic, String payload) {
+        try {
+            String sensorId = topic.startsWith("mine/shadow/reported/") ?
+                    topic.substring("mine/shadow/reported/".length()) : "UNKNOWN";
+
+            log.debug("收到设备影子上报 - 传感器: {}, 内容: {}", sensorId, payload);
+
+            JSONObject reported = JSON.parseObject(payload);
+            if (reported != null && !reported.isEmpty()) {
+                Map<String, Object> reportedState = reported.getInnerMap();
+                deviceShadowService.handleReportedState(sensorId, reportedState);
+            }
+        } catch (Exception e) {
+            log.error("处理设备影子上报失败 - 主题: {}, 错误: {}", topic, e.getMessage(), e);
         }
     }
 

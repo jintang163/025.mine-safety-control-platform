@@ -176,6 +176,10 @@ public class MqttConfig {
         mqttClientInstance.subscribe(commandResponseTopic, 1);
         log.info("已订阅命令响应主题: {} (QoS=1)", commandResponseTopic);
 
+        String shadowReportedTopic = "mine/shadow/reported/#";
+        mqttClientInstance.subscribe(shadowReportedTopic, 1);
+        log.info("已订阅设备影子上报主题: {} (QoS=1)", shadowReportedTopic);
+
         // 发布上线通知
         String onlinePayload = String.format("{\"clientId\":\"%s\",\"status\":\"online\",\"time\":%d}",
                 clientId, System.currentTimeMillis());
