@@ -285,18 +285,29 @@ public class HistoryAnalysisService {
         dto.setTimeSeries(points);
     }
 
-    public List<BigDecimal> getDailyAvgValues(String sensorType, String zoneCode,
+    public List<BigDecimal> getDailyAvgValues(String sensorType, String location,
                                                String startDate, int days) {
+        return getDailyAvgValuesInternal(sensorType, location, startDate, days);
+    }
+
+    public List<BigDecimal> getDailyAvgValuesByZone(String sensorType, String zoneCode,
+                                                     String startDate, int days) {
+        String location = resolveLocationFromZoneCode(zoneCode, sensorType);
+        return getDailyAvgValuesInternal(sensorType, location, startDate, days);
+    }
+
+    private List<BigDecimal> getDailyAvgValuesInternal(String sensorType, String location,
+                                                        String startDate, int days) {
         LocalDateTime start = LocalDate.parse(startDate, DATE_FMT).atStartOfDay();
         LocalDateTime end = start.plusDays(days);
 
-        String zoneFilter = zoneCode != null ?
-                " and r[\"location\"] == \"" + zoneCode + "\"" : "";
+        String locationFilter = location != null ?
+                " and r[\"location\"] == \"" + location + "\"" : "";
 
         String flux = String.format(
                 "from(bucket: \"%s\") " +
                 "|> range(start: %d, stop: %d) " +
-                "|> filter(fn: (r) => r[\"_measurement\"] == \"sensor_data\" and r[\"sensor_type\"] == \"%s\"" + zoneFilter + ") " +
+                "|> filter(fn: (r) => r[\"_measurement\"] == \"sensor_data\" and r[\"sensor_type\"] == \"%s\"" + locationFilter + ") " +
                 "|> filter(fn: (r) => r[\"_field\"] == \"value\") " +
                 "|> aggregateWindow(every: 1d, fn: mean, createEmpty: false) " +
                 "|> sort(columns: [\"_time\"])",
@@ -323,18 +334,29 @@ public class HistoryAnalysisService {
         return values;
     }
 
-    public List<BigDecimal> getOverThresholdDailyCounts(String sensorType, String zoneCode,
+    public List<BigDecimal> getOverThresholdDailyCounts(String sensorType, String location,
                                                          BigDecimal threshold, String startDate, int days) {
+        return getOverThresholdDailyCountsInternal(sensorType, location, threshold, startDate, days);
+    }
+
+    public List<BigDecimal> getOverThresholdDailyCountsByZone(String sensorType, String zoneCode,
+                                                               BigDecimal threshold, String startDate, int days) {
+        String location = resolveLocationFromZoneCode(zoneCode, sensorType);
+        return getOverThresholdDailyCountsInternal(sensorType, location, threshold, startDate, days);
+    }
+
+    private List<BigDecimal> getOverThresholdDailyCountsInternal(String sensorType, String location,
+                                                                  BigDecimal threshold, String startDate, int days) {
         LocalDateTime start = LocalDate.parse(startDate, DATE_FMT).atStartOfDay();
         LocalDateTime end = start.plusDays(days);
 
-        String zoneFilter = zoneCode != null ?
-                " and r[\"location\"] == \"" + zoneCode + "\"" : "";
+        String locationFilter = location != null ?
+                " and r[\"location\"] == \"" + location + "\"" : "";
 
         String flux = String.format(
                 "from(bucket: \"%s\") " +
                 "|> range(start: %d, stop: %d) " +
-                "|> filter(fn: (r) => r[\"_measurement\"] == \"sensor_data\" and r[\"sensor_type\"] == \"%s\"" + zoneFilter + ") " +
+                "|> filter(fn: (r) => r[\"_measurement\"] == \"sensor_data\" and r[\"sensor_type\"] == \"%s\"" + locationFilter + ") " +
                 "|> filter(fn: (r) => r[\"_field\"] == \"value\") " +
                 "|> filter(fn: (r) => float(v: r._value) > %s) " +
                 "|> aggregateWindow(every: 1d, fn: count, createEmpty: false) " +
@@ -360,5 +382,20 @@ public class HistoryAnalysisService {
             log.error("查询日超标计数序列失败: {}", e.getMessage());
         }
         return values;
+    }
+
+    private String resolveLocationFromZoneCode(String zoneCode, String sensorType) {
+        if (zoneCode == null || zoneCode.isBlank()) {
+            return null;
+        }
+        LambdaQueryWrapper<Sensor> wrapper = new LambdaQueryWrapper<Sensor>()
+                .eq(Sensor::getZoneCode, zoneCode)
+                .isNotNull(Sensor::getLocation)
+                .last("LIMIT 1");
+        if (sensorType != null) {
+            wrapper.eq(Sensor::getType, sensorType);
+        }
+        Sensor sensor = sensorRepository.selectOne(wrapper);
+        return sensor != null ? sensor.getLocation() : null;
     }
 }

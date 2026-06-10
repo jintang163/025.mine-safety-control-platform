@@ -19,8 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -62,13 +61,15 @@ public class TrendAnalysisService {
         int totalDays = periodDays * rule.getConsecutivePeriods() + periodDays;
         String startDate = LocalDate.now().minusDays(totalDays).format(DATE_FMT);
 
-        List<String> zoneCodes = getDistinctZoneCodes(rule.getSensorType());
-        if (zoneCodes.isEmpty()) {
-            zoneCodes.add(null);
+        List<String> locations = getDistinctLocations(rule.getSensorType(), rule.getZoneCode());
+        if (locations.isEmpty()) {
+            locations.add(null);
         }
 
-        for (String zoneCode : zoneCodes) {
-            List<BigDecimal> periodValues = calculateMetricPeriods(rule, zoneCode, startDate, periodDays);
+        for (String location : locations) {
+            String zoneCode = resolveZoneCodeByLocation(location, rule.getSensorType());
+
+            List<BigDecimal> periodValues = calculateMetricPeriods(rule, location, startDate, periodDays);
 
             if (periodValues.size() < rule.getConsecutivePeriods()) {
                 continue;
@@ -77,33 +78,36 @@ public class TrendAnalysisService {
             boolean trendDetected = detectTrend(periodValues, rule.getTrendDirection(), rule.getConsecutivePeriods());
 
             if (trendDetected) {
-                boolean alreadyAlerted = checkExistingAlert(rule, zoneCode);
+                LocalDate endDate = LocalDate.now();
+                LocalDate trendStart = endDate.minusDays((long) periodDays * rule.getConsecutivePeriods());
+
+                boolean alreadyAlerted = checkExistingAlert(rule, location, trendStart, endDate);
                 if (!alreadyAlerted) {
-                    createTrendAlert(rule, zoneCode, periodValues, periodDays);
+                    createTrendAlert(rule, zoneCode, location, periodValues, periodDays);
                 }
             }
         }
     }
 
-    private List<BigDecimal> calculateMetricPeriods(TrendRule rule, String zoneCode, String startDate, int periodDays) {
+    private List<BigDecimal> calculateMetricPeriods(TrendRule rule, String location, String startDate, int periodDays) {
         return switch (rule.getMetric()) {
             case "DAILY_AVG" -> {
                 int totalDays = periodDays * rule.getConsecutivePeriods();
                 List<BigDecimal> dailyAvgs = historyAnalysisService.getDailyAvgValues(
-                        rule.getSensorType(), zoneCode, startDate, totalDays);
+                        rule.getSensorType(), location, startDate, totalDays);
                 yield aggregateIntoPeriods(dailyAvgs, periodDays);
             }
             case "DAILY_MAX" -> {
                 int totalDays = periodDays * rule.getConsecutivePeriods();
                 List<BigDecimal> dailyAvgs = historyAnalysisService.getDailyAvgValues(
-                        rule.getSensorType(), zoneCode, startDate, totalDays);
+                        rule.getSensorType(), location, startDate, totalDays);
                 yield aggregateIntoPeriods(dailyAvgs, periodDays);
             }
             case "OVER_THRESHOLD_COUNT" -> {
                 int totalDays = periodDays * rule.getConsecutivePeriods();
                 BigDecimal threshold = rule.getThresholdValue() != null ? rule.getThresholdValue() : BigDecimal.ONE;
                 List<BigDecimal> dailyCounts = historyAnalysisService.getOverThresholdDailyCounts(
-                        rule.getSensorType(), zoneCode, threshold, startDate, totalDays);
+                        rule.getSensorType(), location, threshold, startDate, totalDays);
                 yield aggregateIntoPeriods(dailyCounts, periodDays);
             }
             default -> new ArrayList<>();
@@ -116,8 +120,10 @@ public class TrendAnalysisService {
             BigDecimal sum = BigDecimal.ZERO;
             int count = 0;
             for (int j = i; j < i + periodDays && j < dailyValues.size(); j++) {
-                sum = sum.add(dailyValues.get(j));
-                count++;
+                if (dailyValues.get(j) != null) {
+                    sum = sum.add(dailyValues.get(j));
+                    count++;
+                }
             }
             if (count > 0) {
                 periodValues.add(sum.divide(BigDecimal.valueOf(count), 4, BigDecimal.ROUND_HALF_UP));
@@ -134,11 +140,13 @@ public class TrendAnalysisService {
         int recentStart = values.size() - consecutivePeriods;
         for (int i = recentStart + 1; i < values.size(); i++) {
             if ("RISING".equals(direction)) {
-                if (values.get(i).compareTo(values.get(i - 1)) <= 0) {
+                if (values.get(i) == null || values.get(i - 1) == null
+                        || values.get(i).compareTo(values.get(i - 1)) <= 0) {
                     return false;
                 }
             } else if ("FALLING".equals(direction)) {
-                if (values.get(i).compareTo(values.get(i - 1)) >= 0) {
+                if (values.get(i) == null || values.get(i - 1) == null
+                        || values.get(i).compareTo(values.get(i - 1)) >= 0) {
                     return false;
                 }
             }
@@ -146,24 +154,28 @@ public class TrendAnalysisService {
         return true;
     }
 
-    private boolean checkExistingAlert(TrendRule rule, String zoneCode) {
+    private boolean checkExistingAlert(TrendRule rule, String location, LocalDate startDate, LocalDate endDate) {
         LambdaQueryWrapper<TrendAlert> wrapper = new LambdaQueryWrapper<TrendAlert>()
                 .eq(TrendAlert::getRuleId, rule.getId())
-                .eq(TrendAlert::getStatus, 0);
+                .ge(TrendAlert::getStartDate, startDate)
+                .le(TrendAlert::getEndDate, endDate);
 
-        if (zoneCode != null) {
-            wrapper.eq(TrendAlert::getZoneCode, zoneCode);
-        } else {
-            wrapper.isNull(TrendAlert::getZoneCode);
+        if (location != null) {
+            wrapper.eq(TrendAlert::getZoneCode, location);
         }
+
+        wrapper.in(TrendAlert::getStatus, 0, 1);
 
         return trendAlertRepository.selectCount(wrapper) > 0;
     }
 
     @Transactional
-    public void createTrendAlert(TrendRule rule, String zoneCode, List<BigDecimal> periodValues, int periodDays) {
+    public TrendAlert createTrendAlert(TrendRule rule, String zoneCode, String location,
+                                       List<BigDecimal> periodValues, int periodDays) {
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusDays((long) periodDays * rule.getConsecutivePeriods());
+
+        String displayZone = location != null ? location : (zoneCode != null ? zoneCode : "全局");
 
         TrendAlert alert = new TrendAlert();
         alert.setAlertNo(generateAlertNo());
@@ -171,7 +183,7 @@ public class TrendAnalysisService {
         alert.setRuleCode(rule.getRuleCode());
         alert.setRuleName(rule.getRuleName());
         alert.setSensorType(rule.getSensorType());
-        alert.setZoneCode(zoneCode);
+        alert.setZoneCode(location);
         alert.setMetric(rule.getMetric());
         alert.setTrendDirection(rule.getTrendDirection());
         alert.setConsecutivePeriods(rule.getConsecutivePeriods());
@@ -195,15 +207,14 @@ public class TrendAnalysisService {
             case "MONTH" -> "月";
             default -> rule.getPeriodUnit();
         };
-        String zoneText = zoneCode != null ? zoneCode : "全局";
         alert.setDescription(String.format("区域[%s] %s传感器%s指标连续%d%s持续%s，请及时评估风险",
-                zoneText, rule.getSensorType(), rule.getMetric(),
+                displayZone, rule.getSensorType(), rule.getMetric(),
                 rule.getConsecutivePeriods(), periodText, directionText));
         alert.setSeverity(rule.getSeverity());
         alert.setStatus(0);
 
         trendAlertRepository.insert(alert);
-        log.warn("趋势预警已创建 - 编号: {}, 规则: {}, 区域: {}", alert.getAlertNo(), rule.getRuleCode(), zoneCode);
+        log.warn("趋势预警已创建 - 编号: {}, 规则: {}, 区域: {}", alert.getAlertNo(), rule.getRuleCode(), displayZone);
 
         if (rule.getNotificationChannels() != null) {
             try {
@@ -212,19 +223,39 @@ public class TrendAnalysisService {
                 log.error("趋势预警通知推送失败: {}", e.getMessage());
             }
         }
+        return alert;
     }
 
-    private List<String> getDistinctZoneCodes(String sensorType) {
+    private List<String> getDistinctLocations(String sensorType, String zoneCodeFilter) {
         LambdaQueryWrapper<Sensor> wrapper = new LambdaQueryWrapper<>();
         if (sensorType != null) {
             wrapper.eq(Sensor::getType, sensorType);
         }
-        wrapper.select(Sensor::getZoneCode).isNotNull(Sensor::getZoneCode()).groupBy(Sensor::getZoneCode);
+        if (zoneCodeFilter != null && !zoneCodeFilter.isBlank()) {
+            wrapper.eq(Sensor::getZoneCode, zoneCodeFilter);
+        }
+        wrapper.select(Sensor::getLocation).isNotNull(Sensor::getLocation).groupBy(Sensor::getLocation);
 
         return sensorRepository.selectList(wrapper).stream()
-                .map(Sensor::getZoneCode)
+                .map(Sensor::getLocation)
+                .filter(l -> l != null && !l.isBlank())
                 .distinct()
                 .collect(Collectors.toList());
+    }
+
+    private String resolveZoneCodeByLocation(String location, String sensorType) {
+        if (location == null) {
+            return null;
+        }
+        LambdaQueryWrapper<Sensor> wrapper = new LambdaQueryWrapper<Sensor>()
+                .eq(Sensor::getLocation, location)
+                .isNotNull(Sensor::getZoneCode)
+                .last("LIMIT 1");
+        if (sensorType != null) {
+            wrapper.eq(Sensor::getType, sensorType);
+        }
+        Sensor sensor = sensorRepository.selectOne(wrapper);
+        return sensor != null ? sensor.getZoneCode() : null;
     }
 
     public List<TrendAnalysisDTO> getTrendAlerts(String sensorType, String zoneCode, Integer status) {
@@ -306,7 +337,10 @@ public class TrendAnalysisService {
         dto.setSeverity(alert.getSeverity());
 
         if (alert.getTrendData() != null) {
-            dto.setPeriodValues(JSON.parseArray(alert.getTrendData(), TrendAnalysisDTO.PeriodValue.class));
+            try {
+                dto.setPeriodValues(JSON.parseArray(alert.getTrendData(), TrendAnalysisDTO.PeriodValue.class));
+            } catch (Exception ignored) {
+            }
         }
         return dto;
     }

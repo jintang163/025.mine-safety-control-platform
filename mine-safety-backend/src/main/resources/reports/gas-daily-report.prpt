@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<report xmlns="http://jfreereport.sourceforge.net/namespaces/reports/legacy/ext"
+        name="gas-daily-report"
+        page-definition="A4"
+        orientation="Portrait">
+
+    <configuration>
+        <property name="org.jfree.report.NoDataPrintMessage">暂无数据</property>
+        <property name="org.jfree.report.ResourceBufferSize">4000000</property>
+    </configuration>
+
+    <report-header>
+        <band height="80">
+            <label x="0" y="0" width="555" height="30"
+                   fontname="SansSerif" fontsize="18" bold="true"
+                   horizontalalignment="CENTER" verticalalignment="MIDDLE">
+                煤矿瓦斯监测日报表
+            </label>
+            <label x="0" y="35" width="150" height="20" fontname="SansSerif" fontsize="10">
+                报表编号: ${reportNo}
+            </label>
+            <label x="200" y="35" width="200" height="20" fontname="SansSerif" fontsize="10">
+                统计周期: ${startDate} 至 ${endDate}
+            </label>
+            <label x="420" y="35" width="135" height="20" fontname="SansSerif" fontsize="10"
+                   horizontalalignment="RIGHT">
+                生成时间: ${generatedAt}
+            </label>
+            <line x="0" y="60" width="555" height="1" stroke-width="1"/>
+        </band>
+    </report-header>
+
+    <page-header>
+        <band height="20">
+            <label x="0" y="0" width="100" height="18" fontname="SansSerif" fontsize="9" bold="true">区域</label>
+            <label x="100" y="0" width="100" height="18" fontname="SansSerif" fontsize="9" bold="true">传感器编号</label>
+            <label x="200" y="0" width="80" height="18" fontname="SansSerif" fontsize="9" bold="true" horizontalalignment="RIGHT">平均值</label>
+            <label x="280" y="0" width="80" height="18" fontname="SansSerif" fontsize="9" bold="true" horizontalalignment="RIGHT">最大值</label>
+            <label x="360" y="0" width="60" height="18" fontname="SansSerif" fontsize="9" bold="true" horizontalalignment="RIGHT">预警次数</label>
+            <label x="420" y="0" width="60" height="18" fontname="SansSerif" fontsize="9" bold="true" horizontalalignment="RIGHT">断电次数</label>
+            <label x="480" y="0" width="75" height="18" fontname="SansSerif" fontsize="9" bold="true" horizontalalignment="RIGHT">超标分钟</label>
+        </band>
+    </page-header>
+
+    <item-band>
+        <band height="18">
+            <text-field x="0" y="0" width="100" height="16" fontname="SansSerif" fontsize="9" field="zoneCode"/>
+            <text-field x="100" y="0" width="100" height="16" fontname="SansSerif" fontsize="9" field="sensorId"/>
+            <text-field x="200" y="0" width="80" height="16" fontname="SansSerif" fontsize="9" horizontalalignment="RIGHT" field="avgValue"/>
+            <text-field x="280" y="0" width="80" height="16" fontname="SansSerif" fontsize="9" horizontalalignment="RIGHT" field="maxValue"/>
+            <text-field x="360" y="0" width="60" height="16" fontname="SansSerif" fontsize="9" horizontalalignment="RIGHT" field="overWarningCount"/>
+            <text-field x="420" y="0" width="60" height="16" fontname="SansSerif" fontsize="9" horizontalalignment="RIGHT" field="overPowerOffCount"/>
+            <text-field x="480" y="0" width="75" height="16" fontname="SansSerif" fontsize="9" horizontalalignment="RIGHT" field="overThresholdDurationMinutes"/>
+        </band>
+    </item-band>
+
+    <report-footer>
+        <band height="60">
+            <line x="0" y="0" width="555" height="1" stroke-width="1"/>
+            <label x="0" y="10" width="200" height="20" fontname="SansSerif" fontsize="10" bold="true">
+                传感器总数: ${sensorTotal}
+            </label>
+            <label x="200" y="10" width="200" height="20" fontname="SansSerif" fontsize="10" bold="true">
+                报警总次数: ${alertTotal}
+            </label>
+            <label x="0" y="35" width="555" height="20" fontname="SansSerif" fontsize="9"
+                   horizontalalignment="CENTER" style="italic">
+                本报表由系统自动生成，如有疑问请联系安全管理部门
+            </label>
+        </band>
+    </report-footer>
+
+</report>

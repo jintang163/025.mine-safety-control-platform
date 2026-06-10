@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -379,5 +380,61 @@ public class DeviceFaultOrderService {
     }
 
     private record AssigneeInfo(String assignee, String assigneePhone, String assigneeUserId) {
+    }
+
+    public int checkAndProcessOfflineSensors(int offlineTimeoutMinutes, int lowBatteryThreshold, int calibrationExpiringDays) {
+        int count = 0;
+        LocalDateTime now = LocalDateTime.now();
+
+        LambdaQueryWrapper<Sensor> offlineWrapper = new LambdaQueryWrapper<Sensor>()
+                .eq(Sensor::getStatus, "ONLINE")
+                .isNotNull(Sensor::getLastUploadTime);
+        List<Sensor> candidates = sensorRepository.selectList(offlineWrapper);
+
+        for (Sensor sensor : candidates) {
+            int timeout = sensor.getOfflineTimeoutMinutes() != null ? sensor.getOfflineTimeoutMinutes() : offlineTimeoutMinutes;
+            if (sensor.getLastUploadTime() != null && sensor.getLastUploadTime().plusMinutes(timeout).isBefore(now)) {
+                try {
+                    processOfflineSensor(sensor);
+                    count++;
+                } catch (Exception e) {
+                    log.error("处理离线传感器失败 - sensorId: {}", sensor.getSensorId(), e);
+                }
+            }
+        }
+
+        LambdaQueryWrapper<Sensor> lowBatteryWrapper = new LambdaQueryWrapper<Sensor>()
+                .eq(Sensor::getStatus, "ONLINE")
+                .isNotNull(Sensor::getBatteryLevel)
+                .le(Sensor::getBatteryLevel, lowBatteryThreshold);
+        List<Sensor> lowBatterySensors = sensorRepository.selectList(lowBatteryWrapper);
+        for (Sensor sensor : lowBatterySensors) {
+            try {
+                processLowBatterySensor(sensor);
+                count++;
+            } catch (Exception e) {
+                log.error("处理低电量传感器失败 - sensorId: {}", sensor.getSensorId(), e);
+            }
+        }
+
+        LambdaQueryWrapper<Sensor> calibrationWrapper = new LambdaQueryWrapper<Sensor>()
+                .eq(Sensor::getStatus, "ONLINE")
+                .isNotNull(Sensor::getNextCalibrationDate);
+        List<Sensor> calibrationCandidates = sensorRepository.selectList(calibrationWrapper);
+        LocalDate calibrationThreshold = LocalDate.now().plusDays(calibrationExpiringDays);
+        for (Sensor sensor : calibrationCandidates) {
+            if (sensor.getNextCalibrationDate() != null && !sensor.getNextCalibrationDate().isAfter(calibrationThreshold)) {
+                try {
+                    processCalibrationExpiringSensor(sensor);
+                    count++;
+                } catch (Exception e) {
+                    log.error("处理校验到期传感器失败 - sensorId: {}", sensor.getSensorId(), e);
+                }
+            }
+        }
+
+        log.info("传感器巡检完成 - 离线超时{}分钟, 低电量{}%, 校验{}天内到期, 共处理: {} 个",
+                offlineTimeoutMinutes, lowBatteryThreshold, calibrationExpiringDays, count);
+        return count;
     }
 }
