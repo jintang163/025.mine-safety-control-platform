@@ -2,6 +2,7 @@ package com.mine.safety.service;
 
 import com.alibaba.fastjson2.JSON;
 import com.mine.safety.domain.DeviceFaultOrder;
+import com.mine.safety.domain.TrendAlert;
 import com.mine.safety.dto.AlertDTO;
 import com.mine.safety.service.LinkageActionEngineService.ActionResult;
 import lombok.RequiredArgsConstructor;
@@ -467,6 +468,71 @@ public class MessagePushService {
             sb.append("\n");
         }
         sb.append("时间: ").append(order.getFaultTime());
+        return sb.toString();
+    }
+
+    public boolean pushTrendAlertMessage(TrendAlert alert, String channelsStr) {
+        log.info("推送趋势预警消息 - 编号: {}, 渠道: {}", alert.getAlertNo(), channelsStr);
+
+        List<String> channels = Arrays.stream(channelsStr.split(","))
+                .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+
+        String content = buildTrendAlertContent(alert);
+        boolean urgent = "ALERT".equals(alert.getSeverity()) || "CRITICAL".equals(alert.getSeverity());
+        boolean anySuccess = false;
+
+        for (String channel : channels) {
+            try {
+                boolean success = switch (channel) {
+                    case "WECHAT_WORK" -> pushWeChatWorkTrendAlert(alert, content, urgent);
+                    case "APP" -> pushAppTrendAlert(alert, content, urgent);
+                    case "SMS" -> pushSmsTrendAlert(alert, content, urgent);
+                    default -> false;
+                };
+                if (success) anySuccess = true;
+            } catch (Exception e) {
+                log.warn("趋势预警推送失败 - 渠道: {}, 编号: {}", channel, alert.getAlertNo(), e);
+            }
+        }
+        return anySuccess;
+    }
+
+    private boolean pushWeChatWorkTrendAlert(TrendAlert alert, String content, boolean urgent) {
+        if (!wechatEnabled || wechatCorpId.isEmpty()) return false;
+        log.info("模拟企微推送趋势预警 - 编号: {}, 紧急: {}", alert.getAlertNo(), urgent);
+        return true;
+    }
+
+    private boolean pushAppTrendAlert(TrendAlert alert, String content, boolean urgent) {
+        if (!fcmEnabled) return false;
+        log.info("模拟APP推送趋势预警 - 编号: {}, 紧急: {}", alert.getAlertNo(), urgent);
+        return true;
+    }
+
+    private boolean pushSmsTrendAlert(TrendAlert alert, String content, boolean urgent) {
+        if (!smsEnabled) return false;
+        log.info("模拟短信推送趋势预警 - 编号: {}, 紧急: {}", alert.getAlertNo(), urgent);
+        return true;
+    }
+
+    private String buildTrendAlertContent(TrendAlert alert) {
+        String directionText = "RISING".equals(alert.getTrendDirection()) ? "上升" : "下降";
+        String periodText = switch (alert.getPeriodUnit()) {
+            case "DAY" -> "日";
+            case "WEEK" -> "周";
+            case "MONTH" -> "月";
+            default -> alert.getPeriodUnit();
+        };
+        StringBuilder sb = new StringBuilder();
+        sb.append("趋势预警编号: ").append(alert.getAlertNo()).append("\n");
+        sb.append("规则: ").append(alert.getRuleName()).append("\n");
+        sb.append("类型: ").append(alert.getSensorType()).append("\n");
+        if (alert.getZoneCode() != null) sb.append("区域: ").append(alert.getZoneCode()).append("\n");
+        sb.append("指标: ").append(alert.getMetric()).append("\n");
+        sb.append("趋势: 连续").append(alert.getConsecutivePeriods()).append(periodText).append(directionText).append("\n");
+        sb.append("级别: ").append(alert.getSeverity()).append("\n");
+        if (alert.getDescription() != null) sb.append("描述: ").append(alert.getDescription()).append("\n");
+        sb.append("时间: ").append(alert.getStartDate()).append(" ~ ").append(alert.getEndDate());
         return sb.toString();
     }
 

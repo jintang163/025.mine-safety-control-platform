@@ -577,3 +577,123 @@ INSERT IGNORE INTO maintenance_assignee_rules (zone_code, sensor_type, fault_typ
 (NULL, 'CO', 'OFFLINE', '孙工', '13800000006', 'SunGong', 5, 1),
 (NULL, NULL, 'LOW_BATTERY', '周工', '13800000007', 'ZhouGong', 3, 1),
 (NULL, NULL, NULL, '值班室', '13800000000', 'DutyRoom', 0, 1);
+
+-- ==================== 报表与趋势分析 ====================
+
+CREATE TABLE IF NOT EXISTS report_templates (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    template_code VARCHAR(64) NOT NULL UNIQUE COMMENT '模板编码',
+    template_name VARCHAR(128) NOT NULL COMMENT '模板名称',
+    template_type VARCHAR(32) NOT NULL COMMENT '模板类型: DAILY_GAS-瓦斯日报, WEEKLY_DUST-粉尘周报, MONTHLY_SUMMARY-月度汇总',
+    description VARCHAR(512) COMMENT '模板描述',
+    sensor_types VARCHAR(256) NOT NULL COMMENT '关联传感器类型(逗号分隔)',
+    time_dimension VARCHAR(16) NOT NULL COMMENT '时间维度: HOUR,DAY,WEEK,MONTH',
+    content_template JSON COMMENT '报表内容模板(JSON)',
+    file_format VARCHAR(16) DEFAULT 'PDF' COMMENT '默认导出格式: PDF,EXCEL',
+    enabled TINYINT DEFAULT 1 COMMENT '是否启用: 0-禁用, 1-启用',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_template_type (template_type),
+    INDEX idx_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报表模板表';
+
+CREATE TABLE IF NOT EXISTS report_records (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    report_no VARCHAR(64) NOT NULL UNIQUE COMMENT '报表编号',
+    template_id BIGINT NOT NULL COMMENT '关联模板ID',
+    template_code VARCHAR(64) NOT NULL COMMENT '模板编码',
+    report_name VARCHAR(256) NOT NULL COMMENT '报表名称',
+    report_type VARCHAR(32) NOT NULL COMMENT '报表类型',
+    start_date DATE NOT NULL COMMENT '统计开始日期',
+    end_date DATE NOT NULL COMMENT '统计结束日期',
+    time_dimension VARCHAR(16) NOT NULL COMMENT '时间维度',
+    sensor_types VARCHAR(256) COMMENT '包含传感器类型',
+    zone_code VARCHAR(32) COMMENT '区域编码',
+    report_data JSON COMMENT '报表数据(JSON)',
+    file_format VARCHAR(16) DEFAULT 'PDF' COMMENT '文件格式: PDF,EXCEL',
+    file_path VARCHAR(512) COMMENT 'MinIO文件路径',
+    file_size BIGINT COMMENT '文件大小(字节)',
+    file_url VARCHAR(1024) COMMENT '文件访问URL',
+    generated_by VARCHAR(64) COMMENT '生成人',
+    generation_source VARCHAR(16) DEFAULT 'MANUAL' COMMENT '生成来源: MANUAL-手动, SCHEDULED-定时',
+    status TINYINT DEFAULT 0 COMMENT '状态: 0-生成中, 1-已完成, 2-生成失败',
+    error_message VARCHAR(512) COMMENT '错误信息',
+    email_sent TINYINT DEFAULT 0 COMMENT '是否已邮件推送: 0-否, 1-是',
+    email_sent_time DATETIME COMMENT '邮件推送时间',
+    email_recipients VARCHAR(1024) COMMENT '邮件接收人(逗号分隔)',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_report_no (report_no),
+    INDEX idx_template_id (template_id),
+    INDEX idx_report_type (report_type),
+    INDEX idx_start_date (start_date),
+    INDEX idx_end_date (end_date),
+    INDEX idx_status (status),
+    INDEX idx_generation_source (generation_source)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报表记录表';
+
+CREATE TABLE IF NOT EXISTS trend_rules (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    rule_code VARCHAR(64) NOT NULL UNIQUE COMMENT '规则编码',
+    rule_name VARCHAR(128) NOT NULL COMMENT '规则名称',
+    description VARCHAR(512) COMMENT '规则描述',
+    sensor_type VARCHAR(32) NOT NULL COMMENT '传感器类型',
+    zone_code VARCHAR(32) COMMENT '区域编码(NULL=全部)',
+    metric VARCHAR(32) NOT NULL COMMENT '监测指标: DAILY_AVG-日均值, DAILY_MAX-日最大值, OVER_THRESHOLD_COUNT-超标次数',
+    trend_direction VARCHAR(16) NOT NULL COMMENT '趋势方向: RISING-上升, FALLING-下降',
+    consecutive_periods INT NOT NULL DEFAULT 3 COMMENT '连续周期数',
+    period_unit VARCHAR(16) NOT NULL DEFAULT 'WEEK' COMMENT '周期单位: DAY,WEEK,MONTH',
+    threshold_value DECIMAL(10,4) COMMENT '触发阈值(可选)',
+    severity VARCHAR(16) NOT NULL DEFAULT 'WARNING' COMMENT '严重级别: INFO,WARNING,ALERT,CRITICAL',
+    notification_channels VARCHAR(256) DEFAULT 'APP,WECHAT_WORK' COMMENT '通知渠道',
+    enabled TINYINT DEFAULT 1 COMMENT '是否启用',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_sensor_type (sensor_type),
+    INDEX idx_zone_code (zone_code),
+    INDEX idx_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='趋势分析规则表';
+
+CREATE TABLE IF NOT EXISTS trend_alerts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    alert_no VARCHAR(64) NOT NULL UNIQUE COMMENT '趋势预警编号',
+    rule_id BIGINT NOT NULL COMMENT '关联规则ID',
+    rule_code VARCHAR(64) NOT NULL COMMENT '规则编码',
+    rule_name VARCHAR(128) NOT NULL COMMENT '规则名称',
+    sensor_type VARCHAR(32) NOT NULL COMMENT '传感器类型',
+    zone_code VARCHAR(32) COMMENT '区域编码',
+    metric VARCHAR(32) NOT NULL COMMENT '监测指标',
+    trend_direction VARCHAR(16) NOT NULL COMMENT '趋势方向',
+    consecutive_periods INT NOT NULL COMMENT '连续周期数',
+    period_unit VARCHAR(16) NOT NULL COMMENT '周期单位',
+    start_date DATE NOT NULL COMMENT '趋势开始日期',
+    end_date DATE NOT NULL COMMENT '趋势结束日期',
+    trend_data JSON COMMENT '趋势数据(JSON, 每周期值)',
+    description VARCHAR(1024) COMMENT '趋势描述',
+    severity VARCHAR(16) NOT NULL COMMENT '严重级别',
+    status TINYINT DEFAULT 0 COMMENT '状态: 0-待处理, 1-已确认, 2-已忽略',
+    acknowledged_by VARCHAR(64) COMMENT '确认人',
+    acknowledged_at DATETIME COMMENT '确认时间',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_alert_no (alert_no),
+    INDEX idx_rule_id (rule_id),
+    INDEX idx_sensor_type (sensor_type),
+    INDEX idx_zone_code (zone_code),
+    INDEX idx_severity (severity),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='趋势预警记录表';
+
+INSERT IGNORE INTO report_templates (template_code, template_name, template_type, description, sensor_types, time_dimension, content_template, file_format, enabled) VALUES
+('GAS_DAILY', '煤矿瓦斯监测日报表', 'DAILY_GAS', '每日瓦斯浓度监测数据汇总报表', 'GAS', 'DAY',
+ '{"sections":["header","sensor_summary","hourly_data","alert_summary","conclusion"]}', 'PDF', 1),
+('DUST_WEEKLY', '粉尘浓度周报', 'WEEKLY_DUST', '每周粉尘浓度监测数据汇总报表', 'DUST', 'WEEK',
+ '{"sections":["header","daily_summary","alert_summary","conclusion"]}', 'EXCEL', 1),
+('MONTHLY_SUMMARY', '月度安全监测汇总表', 'MONTHLY_SUMMARY', '月度全类型传感器监测数据汇总报表', 'GAS,DUST,CO', 'MONTH',
+ '{"sections":["header","sensor_type_summary","alert_summary","trend_analysis","conclusion"]}', 'PDF', 1);
+
+INSERT IGNORE INTO trend_rules (rule_code, rule_name, description, sensor_type, zone_code, metric, trend_direction, consecutive_periods, period_unit, severity, notification_channels, enabled) VALUES
+('GAS_RISING_3W', '瓦斯浓度三周连续上升', '某巷道瓦斯浓度日均值连续三周上升，提示风险评估', 'GAS', NULL, 'DAILY_AVG', 'RISING', 3, 'WEEK', 'WARNING', 'APP,WECHAT_WORK', 1),
+('DUST_RISING_2W', '粉尘浓度两周连续上升', '某区域粉尘浓度日均值连续两周上升', 'DUST', NULL, 'DAILY_AVG', 'RISING', 2, 'WEEK', 'INFO', 'APP', 1),
+('CO_RISING_3D', 'CO浓度三日连续上升', '某区域CO浓度日均值连续三日上升，可能存在自燃风险', 'CO', NULL, 'DAILY_AVG', 'RISING', 3, 'DAY', 'ALERT', 'APP,WECHAT_WORK,SMS', 1),
+('GAS_OVER_THRESHOLD_UP', '瓦斯超标次数连续上升', '瓦斯日超标次数连续两周上升', 'GAS', NULL, 'OVER_THRESHOLD_COUNT', 'RISING', 2, 'WEEK', 'WARNING', 'APP,WECHAT_WORK', 1);

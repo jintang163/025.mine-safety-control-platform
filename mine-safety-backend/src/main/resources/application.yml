@@ -96,6 +96,15 @@ mybatis-plus:
       ack-mode: manual
       concurrency: 4
 
+  mail:
+    host: smtp.mine-safety.com
+    port: 587
+    username: noreply@mine-safety.com
+    password: password
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
 mqtt:
   broker:
     url: tcp://localhost:1883
@@ -311,6 +320,24 @@ app:
     enabled: true
     mqtt-desired-topic-prefix: mine/shadow/desired/
     mqtt-reported-topic-prefix: mine/shadow/reported/
+
+  report:
+    mine-name: 某某煤矿
+    email-from: noreply@mine-safety.com
+    email-enabled: false
+    default-file-format: PDF
+
+  trend:
+    enabled: true
+    check-interval-days: 1
+    default-severity: WARNING
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: mine-safety-reports
+  presign-expiry-hours: 24
 
 logging:
   level:
