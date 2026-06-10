@@ -513,6 +513,7 @@ CREATE TABLE IF NOT EXISTS device_fault_orders (
     zone_code VARCHAR(32) COMMENT '区域编码',
     assignee VARCHAR(64) COMMENT '指派维修人员',
     assignee_phone VARCHAR(32) COMMENT '维修人员电话',
+    assignee_user_id VARCHAR(64) COMMENT '维修人员企微UserID',
     status TINYINT DEFAULT 0 COMMENT '状态: 0-待处理, 1-处理中, 2-已完成, 3-已关闭',
     resolution VARCHAR(512) COMMENT '处理结果',
     resolution_time DATETIME COMMENT '处理完成时间',
@@ -548,3 +549,31 @@ INSERT IGNORE INTO sensor_device_shadow (sensor_id, reported_state, desired_stat
 ('GAS-002', '{"samplingInterval":1,"warningThreshold":0.8,"alarmThreshold":1.0,"batteryLevel":95,"signalStrength":80}', '{"samplingInterval":1,"warningThreshold":0.8,"alarmThreshold":1.0}', 1, 1, 'SYNCED'),
 ('DUST-001', '{"samplingInterval":5,"warningThreshold":200,"alarmThreshold":500,"batteryLevel":88,"signalStrength":70}', '{"samplingInterval":5,"warningThreshold":200,"alarmThreshold":500}', 1, 1, 'SYNCED'),
 ('CO-001', '{"samplingInterval":2,"warningThreshold":24,"alarmThreshold":50,"batteryLevel":92,"signalStrength":75}', '{"samplingInterval":2,"warningThreshold":24,"alarmThreshold":50}', 1, 1, 'SYNCED');
+
+CREATE TABLE IF NOT EXISTS maintenance_assignee_rules (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    zone_code VARCHAR(32) COMMENT '区域编码(NULL=全部)',
+    sensor_type VARCHAR(32) COMMENT '传感器类型(NULL=全部)',
+    fault_type VARCHAR(32) COMMENT '故障类型(NULL=全部)',
+    assignee VARCHAR(64) NOT NULL COMMENT '维修人员姓名',
+    assignee_phone VARCHAR(32) COMMENT '维修人员电话',
+    assignee_user_id VARCHAR(64) COMMENT '维修人员企微UserID',
+    priority INT DEFAULT 0 COMMENT '优先级(越大越优先)',
+    enabled TINYINT DEFAULT 1 COMMENT '是否启用: 0-禁用, 1-启用',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_zone_code (zone_code),
+    INDEX idx_sensor_type (sensor_type),
+    INDEX idx_fault_type (fault_type),
+    INDEX idx_enabled (enabled)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='维修人员指派规则表';
+
+INSERT IGNORE INTO maintenance_assignee_rules (zone_code, sensor_type, fault_type, assignee, assignee_phone, assignee_user_id, priority, enabled) VALUES
+('ZONE-01', 'GAS', 'OFFLINE', '张工', '13800000001', 'ZhangGong', 10, 1),
+('ZONE-01', 'GAS', NULL, '李工', '13800000002', 'LiGong', 5, 1),
+('ZONE-01', NULL, NULL, '王主管', '13800000003', 'WangZhuGuan', 1, 1),
+('ZONE-02', 'DUST', NULL, '赵工', '13800000004', 'ZhaoGong', 5, 1),
+('ZONE-02', NULL, NULL, '钱主管', '13800000005', 'QianZhuGuan', 1, 1),
+(NULL, 'CO', 'OFFLINE', '孙工', '13800000006', 'SunGong', 5, 1),
+(NULL, NULL, 'LOW_BATTERY', '周工', '13800000007', 'ZhouGong', 3, 1),
+(NULL, NULL, NULL, '值班室', '13800000000', 'DutyRoom', 0, 1);

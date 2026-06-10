@@ -1,5 +1,6 @@
 package com.mine.safety.controller;
 
+import com.mine.safety.domain.MaintenanceAssigneeRule;
 import com.mine.safety.dto.*;
 import com.mine.safety.service.*;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,6 +22,7 @@ public class SensorDeviceController {
     private final SensorDeviceService sensorDeviceService;
     private final DeviceShadowService deviceShadowService;
     private final DeviceFaultOrderService faultOrderService;
+    private final MaintenanceAssigneeRuleService assigneeRuleService;
 
     @GetMapping("/status")
     public ApiResponse<List<SensorStatusDTO>> getRealtimeStatus(
@@ -169,5 +171,21 @@ public class SensorDeviceController {
     @PutMapping("/fault-orders/{orderNo}/close")
     public ApiResponse<DeviceFaultOrderDTO> closeFaultOrder(@PathVariable String orderNo) {
         return ApiResponse.success(faultOrderService.closeFaultOrder(orderNo));
+    }
+
+    @GetMapping("/assignee-rules")
+    public ApiResponse<List<MaintenanceAssigneeRule>> getAssigneeRules() {
+        return ApiResponse.success(assigneeRuleService.getAllRules());
+    }
+
+    @PostMapping("/assignee-rules")
+    public ApiResponse<MaintenanceAssigneeRule> saveAssigneeRule(@RequestBody MaintenanceAssigneeRule rule) {
+        return ApiResponse.success(assigneeRuleService.saveRule(rule));
+    }
+
+    @DeleteMapping("/assignee-rules/{id}")
+    public ApiResponse<Void> deleteAssigneeRule(@PathVariable Long id) {
+        assigneeRuleService.deleteRule(id);
+        return ApiResponse.success();
     }
 }

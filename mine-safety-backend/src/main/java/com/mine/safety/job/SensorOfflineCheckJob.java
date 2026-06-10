@@ -1,7 +1,6 @@
 package com.mine.safety.job;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.mine.safety.domain.DeviceFaultOrder;
 import com.mine.safety.domain.Sensor;
 import com.mine.safety.repository.SensorRepository;
 import com.mine.safety.service.DeviceFaultOrderService;
@@ -44,30 +43,21 @@ public class SensorOfflineCheckJob implements Job {
     }
 
     private void checkOfflineSensors(int defaultTimeoutMinutes) {
-        LocalDateTime timeout = LocalDateTime.now().minusMinutes(defaultTimeoutMinutes);
-
         List<Sensor> onlineSensors = sensorRepository.selectList(
                 new LambdaQueryWrapper<Sensor>().eq(Sensor::getStatus, Sensor.Status.ONLINE.getValue()));
 
         int offlineCount = 0;
         for (Sensor sensor : onlineSensors) {
-            if (sensor.getLastOnlineTime() == null || sensor.getLastOnlineTime().isBefore(timeout)) {
-                int timeoutMinutes = sensor.getOfflineTimeoutMinutes() != null
-                        ? sensor.getOfflineTimeoutMinutes() : defaultTimeoutMinutes;
+            int timeoutMinutes = sensor.getOfflineTimeoutMinutes() != null
+                    ? sensor.getOfflineTimeoutMinutes() : defaultTimeoutMinutes;
 
-                LocalDateTime sensorTimeout = LocalDateTime.now().minusMinutes(timeoutMinutes);
-                if (sensor.getLastOnlineTime() == null || sensor.getLastOnlineTime().isBefore(sensorTimeout)) {
-                    sensorRepository.updateSensorStatus(sensor.getSensorId(),
-                            Sensor.Status.OFFLINE.getValue(), sensor.getLastOnlineTime());
-                    log.warn("传感器已离线 - ID: {}, 名称: {}, 最后在线: {}",
-                            sensor.getSensorId(), sensor.getName(), sensor.getLastOnlineTime());
-
-                    try {
-                        faultOrderService.autoCreateOfflineFaultOrder(sensor);
-                    } catch (Exception e) {
-                        log.error("创建离线故障工单失败 - 传感器: {}, 错误: {}", sensor.getSensorId(), e.getMessage());
-                    }
+            LocalDateTime sensorTimeout = LocalDateTime.now().minusMinutes(timeoutMinutes);
+            if (sensor.getLastOnlineTime() == null || sensor.getLastOnlineTime().isBefore(sensorTimeout)) {
+                try {
+                    faultOrderService.processOfflineSensor(sensor);
                     offlineCount++;
+                } catch (Exception e) {
+                    log.error("处理离线传感器失败 - 传感器: {}, 错误: {}", sensor.getSensorId(), e.getMessage());
                 }
             }
         }
@@ -83,9 +73,9 @@ public class SensorOfflineCheckJob implements Job {
 
         for (Sensor sensor : lowBatterySensors) {
             try {
-                faultOrderService.autoCreateLowBatteryFaultOrder(sensor);
+                faultOrderService.processLowBatterySensor(sensor);
             } catch (Exception e) {
-                log.error("创建低电量故障工单失败 - 传感器: {}, 错误: {}", sensor.getSensorId(), e.getMessage());
+                log.error("处理低电量传感器失败 - 传感器: {}, 错误: {}", sensor.getSensorId(), e.getMessage());
             }
         }
         if (!lowBatterySensors.isEmpty()) {
@@ -106,15 +96,9 @@ public class SensorOfflineCheckJob implements Job {
             log.warn("校验即将过期的传感器: {} 台", expiringSensors.size());
             for (Sensor sensor : expiringSensors) {
                 try {
-                    String description = String.format("传感器[%s]校验即将过期，下次校验日期: %s",
-                            sensor.getName(), sensor.getNextCalibrationDate());
-
-                    faultOrderService.createFaultOrder(sensor.getSensorId(),
-                            DeviceFaultOrder.FaultType.CALIBRATION_EXPIRED.name(),
-                            DeviceFaultOrder.FaultLevel.MEDIUM.name(),
-                            description, null, null);
+                    faultOrderService.processCalibrationExpiringSensor(sensor);
                 } catch (Exception e) {
-                    log.debug("校验过期工单已存在 - 传感器: {}", sensor.getSensorId());
+                    log.debug("校验过期工单处理失败 - 传感器: {}, 错误: {}", sensor.getSensorId(), e.getMessage());
                 }
             }
         }

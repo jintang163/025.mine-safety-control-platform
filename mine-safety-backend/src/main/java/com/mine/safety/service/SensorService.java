@@ -11,7 +11,6 @@ import com.mine.safety.repository.SensorRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,8 +24,8 @@ import java.util.stream.Collectors;
 
 /**
  * 传感器管理服务
- * 提供传感器的CRUD管理、最新数据查询、历史数据查询、
- * 离线检测等核心功能。
+ * 提供传感器的CRUD管理、最新数据查询、历史数据查询等核心功能。
+ * 离线检测已统一由Quartz定时任务(SensorOfflineCheckJob)负责。
  *
  * 数据查询优先级：
  *   1. Redis缓存（最快，5分钟过期）
@@ -320,22 +319,6 @@ public class SensorService {
         }
 
         return result;
-    }
-
-    /**
-     * 定时检测传感器离线状态（每30秒执行一次）
-     * 检查所有在线传感器的最后在线时间，如果超过5分钟未更新，则标记为离线。
-     */
-    @Scheduled(fixedRate = 30000)
-    public void checkSensorOffline() {
-        LocalDateTime timeout = LocalDateTime.now().minusMinutes(5);
-        List<Sensor> sensors = sensorRepository.findSensorsToCheckOffline(Sensor.Status.ONLINE.getValue(), timeout);
-
-        for (Sensor sensor : sensors) {
-            sensorRepository.updateSensorStatus(sensor.getSensorId(),
-                    Sensor.Status.OFFLINE.getValue(), sensor.getLastOnlineTime());
-            log.warn("传感器已离线: {} - {}", sensor.getSensorId(), sensor.getName());
-        }
     }
 
     /**

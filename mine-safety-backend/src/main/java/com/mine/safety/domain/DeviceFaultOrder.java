@@ -47,6 +47,9 @@ public class DeviceFaultOrder {
     @TableField("assignee_phone")
     private String assigneePhone;
 
+    @TableField("assignee_user_id")
+    private String assigneeUserId;
+
     private Integer status;
 
     private String resolution;

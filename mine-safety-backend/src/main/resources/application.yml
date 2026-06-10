@@ -302,7 +302,7 @@ app:
     enabled: true
     work-order-api-url: ""
     work-order-api-key: ""
-    notify-channels: SMS,APP
+    notify-channels: SMS,APP,WECHAT_WORK
     offline-timeout-minutes: 10
     low-battery-threshold: 20
     calibration-expiring-days: 30
