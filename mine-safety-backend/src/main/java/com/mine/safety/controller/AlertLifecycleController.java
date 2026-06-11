@@ -10,6 +10,7 @@ import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -31,6 +32,7 @@ public class AlertLifecycleController {
     }
 
     @PostMapping("/trigger")
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ApiResponse<Alert> triggerAlert(@RequestBody TriggerAlertRequest request) {
         Alert alert = alertLifecycleService.triggerAlert(
                 request.getSensorId(),
@@ -50,6 +52,7 @@ public class AlertLifecycleController {
     }
 
     @PostMapping("/{alertNo}/confirm")
+    @PreAuthorize("hasAuthority('alert:acknowledge')")
     public ApiResponse<Alert> confirmAlert(@PathVariable String alertNo,
                                             @RequestBody ConfirmRequest request) {
         Alert alert = alertLifecycleService.confirmAlert(alertNo, request.getConfirmedBy());
@@ -57,6 +60,7 @@ public class AlertLifecycleController {
     }
 
     @PostMapping("/{alertNo}/processing")
+    @PreAuthorize("hasAuthority('alert:disposal')")
     public ApiResponse<Alert> startProcessing(@PathVariable String alertNo,
                                                @RequestBody ProcessingRequest request) {
         Alert alert = alertLifecycleService.startProcessing(alertNo, request.getProcessingBy());
@@ -64,6 +68,7 @@ public class AlertLifecycleController {
     }
 
     @PostMapping("/{alertNo}/recover")
+    @PreAuthorize("hasAuthority('alert:disposal')")
     public ApiResponse<Alert> recoverAlert(@PathVariable String alertNo,
                                             @RequestBody RecoverRequest request) {
         Alert alert = alertLifecycleService.recoverAlert(
@@ -72,6 +77,7 @@ public class AlertLifecycleController {
     }
 
     @PostMapping("/{alertNo}/close")
+    @PreAuthorize("hasAuthority('alert:disposal')")
     public ApiResponse<Alert> closeAlert(@PathVariable String alertNo,
                                           @RequestBody CloseRequest request) {
         Alert alert = alertLifecycleService.closeAlert(
@@ -81,6 +87,7 @@ public class AlertLifecycleController {
     }
 
     @PostMapping("/{alertNo}/disposal")
+    @PreAuthorize("hasAuthority('alert:disposal')")
     public ApiResponse<AlertDisposalRecord> addDisposalRecord(@PathVariable String alertNo,
                                                                @RequestBody DisposalRequest request) {
         AlertDisposalRecord record = alertLifecycleService.addDisposalRecord(
@@ -90,16 +97,19 @@ public class AlertLifecycleController {
     }
 
     @GetMapping("/{alertNo}/disposal-records")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<List<AlertDisposalRecord>> getDisposalRecords(@PathVariable String alertNo) {
         return ApiResponse.success(alertLifecycleService.getDisposalRecords(alertNo));
     }
 
     @GetMapping("/{alertNo}/escalation-logs")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<List<AlertEscalationLog>> getEscalationLogs(@PathVariable String alertNo) {
         return ApiResponse.success(alertLifecycleService.getEscalationLogs(alertNo));
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<IPage<Alert>> searchAlerts(
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String level,
@@ -116,11 +126,13 @@ public class AlertLifecycleController {
     }
 
     @GetMapping("/realtime-unconfirmed")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<List<Alert>> getRealtimeUnconfirmedAlerts() {
         return ApiResponse.success(alertLifecycleService.getRealtimeUnconfirmedAlerts());
     }
 
     @GetMapping("/statistics")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<Map<String, Object>> getAlertStatistics(
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
@@ -128,6 +140,7 @@ public class AlertLifecycleController {
     }
 
     @GetMapping("/export")
+    @PreAuthorize("hasAuthority('report:export')")
     public ApiResponse<List<Alert>> exportAlerts(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
@@ -137,6 +150,7 @@ public class AlertLifecycleController {
     }
 
     @GetMapping("/es/search")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<IPage<Map<String, Object>>> esSearch(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String level,
@@ -155,6 +169,7 @@ public class AlertLifecycleController {
     }
 
     @PostMapping("/es/reindex")
+    @PreAuthorize("hasAuthority('system:config')")
     public ApiResponse<String> reindexAll() {
         if (alertSearchService == null) {
             return ApiResponse.error("Elasticsearch未启用");

@@ -29,10 +29,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserDetailsService userDetailsService;
     private final StringRedisTemplate stringRedisTemplate;
 
-    @Value("${spring.security.jwt.header:Authorization}")
+    @Value("${app.jwt.header:Authorization}")
     private String tokenHeader;
 
-    @Value("${spring.security.jwt.prefix:Bearer }")
+    @Value("${app.jwt.prefix:Bearer }")
     private String tokenPrefix;
 
     private static final String TOKEN_BLACKLIST_PREFIX = "token:blacklist:";

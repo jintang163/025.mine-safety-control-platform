@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public class PlcDeviceController {
     private final PlcControlService plcControlService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<IPage<PlcDevice>> getDevices(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -31,24 +33,28 @@ public class PlcDeviceController {
     }
 
     @GetMapping("/enabled")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<PlcDevice>> getEnabledDevices() {
         return ResponseDTO.success(plcDeviceRepository.selectList(
                 new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getEnabled, true)));
     }
 
     @GetMapping("/type/{deviceType}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<PlcDevice>> getDevicesByType(@PathVariable String deviceType) {
         return ResponseDTO.success(plcDeviceRepository.selectList(
                 new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getDeviceType, deviceType).eq(PlcDevice::getEnabled, true)));
     }
 
     @GetMapping("/zone/{zoneCode}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<PlcDevice>> getDevicesByZone(@PathVariable String zoneCode) {
         return ResponseDTO.success(plcDeviceRepository.selectList(
                 new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getZoneCode, zoneCode).eq(PlcDevice::getEnabled, true)));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<PlcDevice> getDeviceById(@PathVariable Long id) {
         PlcDevice device = plcDeviceRepository.selectById(id);
         if (device == null) {
@@ -58,6 +64,7 @@ public class PlcDeviceController {
     }
 
     @GetMapping("/code/{deviceCode}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<PlcDevice> getDeviceByCode(@PathVariable String deviceCode) {
         PlcDevice device = plcDeviceRepository.selectOne(
                 new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getDeviceCode, deviceCode));
@@ -68,6 +75,7 @@ public class PlcDeviceController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<PlcDevice> createDevice(@RequestBody PlcDevice device) {
         if (plcDeviceRepository.selectCount(new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getDeviceCode, device.getDeviceCode())) > 0) {
             return ResponseDTO.error("设备编码已存在");
@@ -79,6 +87,7 @@ public class PlcDeviceController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<PlcDevice> updateDevice(@PathVariable Long id, @RequestBody PlcDevice device) {
         PlcDevice existing = plcDeviceRepository.selectById(id);
         if (existing == null) {
@@ -109,6 +118,7 @@ public class PlcDeviceController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<Void> deleteDevice(@PathVariable Long id) {
         if (plcDeviceRepository.selectById(id) == null) {
             return ResponseDTO.error("设备不存在");
@@ -120,6 +130,7 @@ public class PlcDeviceController {
     }
 
     @PostMapping("/{id}/test")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<Map<String, Object>> testDeviceConnection(@PathVariable Long id) {
         PlcDevice device = plcDeviceRepository.selectById(id);
         if (device == null) {
@@ -134,6 +145,7 @@ public class PlcDeviceController {
     }
 
     @PostMapping("/{id}/on")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<Map<String, Object>> turnOnDevice(@PathVariable Long id) {
         PlcDevice device = plcDeviceRepository.selectById(id);
         if (device == null) {
@@ -148,6 +160,7 @@ public class PlcDeviceController {
     }
 
     @PostMapping("/{id}/off")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<Map<String, Object>> turnOffDevice(@PathVariable Long id) {
         PlcDevice device = plcDeviceRepository.selectById(id);
         if (device == null) {
@@ -162,6 +175,7 @@ public class PlcDeviceController {
     }
 
     @GetMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<Map<String, Object>> getDeviceStatus(@PathVariable Long id) {
         PlcDevice device = plcDeviceRepository.selectById(id);
         if (device == null) {
@@ -178,6 +192,7 @@ public class PlcDeviceController {
     }
 
     @GetMapping("/statistics")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<Map<String, Object>> getDeviceStatistics() {
         long total = plcDeviceRepository.selectCount(null);
         long enabledCount = plcDeviceRepository.selectCount(new LambdaQueryWrapper<PlcDevice>().eq(PlcDevice::getEnabled, true));

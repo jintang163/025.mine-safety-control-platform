@@ -125,31 +125,25 @@ INSERT IGNORE INTO sys_role (role_code, role_name, description, sort_order, stat
 
 -- ==================== 初始化权限数据 ====================
 INSERT IGNORE INTO sys_permission (permission_code, permission_name, permission_type, parent_id, path, component, icon, sort_order, description, status) VALUES
--- 仪表盘
 ('dashboard:view', '仪表盘查看', 'MENU', 0, '/dashboard', 'Dashboard', 'Dashboard', 1, '查看监控仪表盘', 1),
--- 传感器管理
 ('sensor:view', '传感器查看', 'MENU', 0, '/sensor', 'SensorList', 'Sensor', 2, '查看传感器列表和详情', 1),
-('sensor:edit', '传感器编辑', 'BUTTON', 2, NULL, NULL, NULL, 0, '新增/修改传感器信息', 1),
-('sensor:delete', '传感器删除', 'BUTTON', 2, NULL, NULL, NULL, 0, '删除传感器', 1),
--- 报警管理
+('sensor:edit', '传感器编辑', 'BUTTON', 0, NULL, NULL, NULL, 0, '新增/修改传感器信息', 1),
+('sensor:delete', '传感器删除', 'BUTTON', 0, NULL, NULL, NULL, 0, '删除传感器', 1),
 ('alert:view', '报警查看', 'MENU', 0, '/alert', 'AlertList', 'Alert', 3, '查看报警记录', 1),
-('alert:acknowledge', '报警确认', 'BUTTON', 5, NULL, NULL, NULL, 0, '确认报警', 1),
-('alert:disposal', '报警处置', 'BUTTON', 5, NULL, NULL, NULL, 0, '处置报警', 1),
--- 阈值管理
+('alert:edit', '报警编辑', 'BUTTON', 0, NULL, NULL, NULL, 0, '报警规则增删改', 1),
+('alert:acknowledge', '报警确认', 'BUTTON', 0, NULL, NULL, NULL, 0, '确认报警', 1),
+('alert:disposal', '报警处置', 'BUTTON', 0, NULL, NULL, NULL, 0, '处置报警', 1),
 ('threshold:view', '阈值查看', 'MENU', 0, '/threshold', 'ThresholdConfig', 'Settings', 4, '查看阈值配置', 1),
-('threshold:edit', '阈值修改', 'BUTTON', 8, NULL, NULL, NULL, 0, '修改阈值', 1),
-('threshold:approve', '阈值审批', 'BUTTON', 8, NULL, NULL, NULL, 0, '审批阈值调整', 1),
-('threshold:apply', '阈值申请', 'BUTTON', 8, NULL, NULL, NULL, 0, '申请阈值调整', 1),
--- 设备管理
+('threshold:edit', '阈值修改', 'BUTTON', 0, NULL, NULL, NULL, 0, '修改阈值', 1),
+('threshold:approve', '阈值审批', 'BUTTON', 0, NULL, NULL, NULL, 0, '审批阈值调整', 1),
+('threshold:apply', '阈值申请', 'BUTTON', 0, NULL, NULL, NULL, 0, '申请阈值调整', 1),
 ('device:view', '设备查看', 'MENU', 0, '/device', 'DeviceList', 'Device', 5, '查看设备列表', 1),
-('device:edit', '设备编辑', 'BUTTON', 12, NULL, NULL, NULL, 0, '新增/修改设备', 1),
-('device:maintenance', '设备维护', 'BUTTON', 12, NULL, NULL, NULL, 0, '设备维护记录', 1),
-('device:calibration', '设备校准', 'BUTTON', 12, NULL, NULL, NULL, 0, '设备校准记录', 1),
--- 报表管理
+('device:edit', '设备编辑', 'BUTTON', 0, NULL, NULL, NULL, 0, '新增/修改设备', 1),
+('device:maintenance', '设备维护', 'BUTTON', 0, NULL, NULL, NULL, 0, '设备维护记录', 1),
+('device:calibration', '设备校准', 'BUTTON', 0, NULL, NULL, NULL, 0, '设备校准记录', 1),
 ('report:view', '报表查看', 'MENU', 0, '/report', 'ReportList', 'Document', 6, '查看报表', 1),
-('report:generate', '报表生成', 'BUTTON', 17, NULL, NULL, NULL, 0, '生成报表', 1),
-('report:export', '报表导出', 'BUTTON', 17, NULL, NULL, NULL, 0, '导出报表', 1),
--- 系统管理
+('report:generate', '报表生成', 'BUTTON', 0, NULL, NULL, NULL, 0, '生成报表', 1),
+('report:export', '报表导出', 'BUTTON', 0, NULL, NULL, NULL, 0, '导出报表', 1),
 ('system:user', '用户管理', 'MENU', 0, '/system/user', 'UserManage', 'User', 7, '用户管理菜单', 1),
 ('system:role', '角色管理', 'MENU', 0, '/system/role', 'RoleManage', 'Team', 8, '角色管理菜单', 1),
 ('system:log', '操作日志', 'MENU', 0, '/system/log', 'OperationLog', 'FileText', 9, '操作日志查看', 1),
@@ -161,51 +155,37 @@ INSERT IGNORE INTO sys_permission (permission_code, permission_name, permission_
 INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
 SELECT 1, id FROM sys_permission WHERE deleted = 0;
 
--- 矿长 - 全局查看+审批阈值
-INSERT IGNORE INTO sys_role_permission (role_id, permission_id) VALUES
-(2, 1),
-(2, 2),
-(2, 5),
-(2, 6),
-(2, 8),
-(2, 10),
-(2, 12),
-(2, 17),
-(2, 18),
-(2, 22),
-(2, 23);
+-- 矿长 - 全局查看+审批阈值+报警确认
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT 2, id FROM sys_permission WHERE deleted = 0 AND permission_code IN (
+    'dashboard:view', 'sensor:view', 'alert:view', 'alert:edit', 'alert:acknowledge',
+    'threshold:view', 'threshold:edit', 'threshold:approve', 'threshold:apply',
+    'device:view', 'report:view', 'report:generate', 'report:export',
+    'system:monitor', 'system:config'
+);
 
--- 安全科长 - 查看+确认报警
-INSERT IGNORE INTO sys_role_permission (role_id, permission_id) VALUES
-(3, 1),
-(3, 2),
-(3, 5),
-(3, 6),
-(3, 7),
-(3, 8),
-(3, 11),
-(3, 12),
-(3, 17),
-(3, 22);
+-- 安全科长 - 查看+确认报警+阈值申请
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT 3, id FROM sys_permission WHERE deleted = 0 AND permission_code IN (
+    'dashboard:view', 'sensor:view', 'alert:view', 'alert:edit', 'alert:acknowledge',
+    'threshold:view', 'threshold:apply',
+    'device:view', 'report:view', 'system:monitor'
+);
 
 -- 值班员 - 处置报警
-INSERT IGNORE INTO sys_role_permission (role_id, permission_id) VALUES
-(4, 1),
-(4, 2),
-(4, 5),
-(4, 7),
-(4, 8),
-(4, 12),
-(4, 17);
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT 4, id FROM sys_permission WHERE deleted = 0 AND permission_code IN (
+    'dashboard:view', 'sensor:view', 'alert:view', 'alert:disposal',
+    'threshold:view', 'device:view', 'report:view'
+);
 
--- 维修工 - 设备管理
-INSERT IGNORE INTO sys_role_permission (role_id, permission_id) VALUES
-(5, 1),
-(5, 2),
-(5, 12),
-(5, 13),
-(5, 14),
-(5, 15);
+-- 维修工 - 设备管理+校准+维护
+INSERT IGNORE INTO sys_role_permission (role_id, permission_id)
+SELECT 5, id FROM sys_permission WHERE deleted = 0 AND permission_code IN (
+    'dashboard:view', 'sensor:view',
+    'device:view', 'device:edit', 'device:maintenance', 'device:calibration',
+    'report:view'
+);
 
 -- ==================== 初始化用户数据 ====================
 -- 密码都是: 123456 (BCrypt加密)

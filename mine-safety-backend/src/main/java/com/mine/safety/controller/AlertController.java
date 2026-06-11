@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,6 +29,7 @@ public class AlertController {
     private final AlertRuleRepository alertRuleRepository;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<IPage<Alert>> getAlerts(
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String level,
@@ -53,6 +55,7 @@ public class AlertController {
     }
 
     @GetMapping("/{alertNo}")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<Alert> getAlertByNo(@PathVariable String alertNo) {
         Alert alert = alertRepository.selectOne(
                 new LambdaQueryWrapper<Alert>().eq(Alert::getAlertNo, alertNo));
@@ -63,6 +66,7 @@ public class AlertController {
     }
 
     @PostMapping("/{alertNo}/acknowledge")
+    @PreAuthorize("hasAuthority('alert:acknowledge')")
     public ApiResponse<Alert> acknowledgeAlert(
             @PathVariable String alertNo,
             @RequestBody AcknowledgeRequest request) {
@@ -76,17 +80,20 @@ public class AlertController {
     }
 
     @GetMapping("/statistics")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<Map<String, Object>> getAlertStatistics() {
         return ApiResponse.success(alertService.getAlertStatistics());
     }
 
     @GetMapping("/recent")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<List<Alert>> getRecentAlerts() {
         return ApiResponse.success(alertRepository.selectList(
                 new LambdaQueryWrapper<Alert>().orderByDesc(Alert::getCreatedAt).last("LIMIT 10")));
     }
 
     @GetMapping("/rules")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ApiResponse<List<AlertRule>> getAlertRules(
             @RequestParam(required = false) Integer enabled) {
         List<AlertRule> rules;
@@ -100,12 +107,14 @@ public class AlertController {
     }
 
     @PostMapping("/rules")
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ApiResponse<AlertRule> createAlertRule(@RequestBody AlertRule rule) {
         alertRuleRepository.insert(rule);
         return ApiResponse.success(rule);
     }
 
     @PutMapping("/rules/{id}")
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ApiResponse<AlertRule> updateAlertRule(
             @PathVariable Long id,
             @RequestBody AlertRule rule) {
@@ -115,6 +124,7 @@ public class AlertController {
     }
 
     @DeleteMapping("/rules/{id}")
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ApiResponse<Void> deleteAlertRule(@PathVariable Long id) {
         alertRuleRepository.deleteById(id);
         return ApiResponse.success();

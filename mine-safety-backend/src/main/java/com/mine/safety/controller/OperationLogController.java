@@ -6,6 +6,7 @@ import com.mine.safety.dto.ApiResponse;
 import com.mine.safety.service.OperationLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -18,6 +19,7 @@ public class OperationLogController {
     private final OperationLogService operationLogService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('system:log')")
     public ApiResponse<IPage<SysOperationLog>> getOperationLogs(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String operationType,

@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -26,6 +27,7 @@ public class LinkageExecutionController {
     private final LinkageExecutionRecordRepository executionRecordRepository;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<IPage<LinkageExecutionRecord>> getExecutions(
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime,
@@ -43,6 +45,7 @@ public class LinkageExecutionController {
     }
 
     @GetMapping("/alert/{alertId}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<LinkageExecutionRecord>> getExecutionsByAlertId(@PathVariable Long alertId) {
         List<LinkageExecutionRecord> records = executionRecordRepository.selectList(
                 new LambdaQueryWrapper<LinkageExecutionRecord>().eq(LinkageExecutionRecord::getAlertId, alertId));
@@ -50,24 +53,28 @@ public class LinkageExecutionController {
     }
 
     @GetMapping("/rule/{ruleId}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<LinkageExecutionRecord>> getExecutionsByRuleId(@PathVariable Long ruleId) {
         return ResponseDTO.success(executionRecordRepository.selectList(
                 new LambdaQueryWrapper<LinkageExecutionRecord>().eq(LinkageExecutionRecord::getRuleId, ruleId)));
     }
 
     @GetMapping("/action/{actionId}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<LinkageExecutionRecord>> getExecutionsByActionId(@PathVariable Long actionId) {
         return ResponseDTO.success(executionRecordRepository.selectList(
                 new LambdaQueryWrapper<LinkageExecutionRecord>().eq(LinkageExecutionRecord::getActionId, actionId)));
     }
 
     @GetMapping("/status/{status}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<LinkageExecutionRecord>> getExecutionsByStatus(@PathVariable Integer status) {
         return ResponseDTO.success(executionRecordRepository.selectList(
                 new LambdaQueryWrapper<LinkageExecutionRecord>().eq(LinkageExecutionRecord::getStatus, status)));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<LinkageExecutionRecord> getExecutionById(@PathVariable Long id) {
         LinkageExecutionRecord record = executionRecordRepository.selectById(id);
         if (record == null) {
@@ -77,6 +84,7 @@ public class LinkageExecutionController {
     }
 
     @GetMapping("/statistics")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<Map<String, Object>> getExecutionStatistics(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
@@ -114,6 +122,7 @@ public class LinkageExecutionController {
     }
 
     @GetMapping("/retry/{id}")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<Map<String, Object>> retryExecution(@PathVariable Long id) {
         LinkageExecutionRecord record = executionRecordRepository.selectById(id);
         if (record == null) {

@@ -16,10 +16,10 @@ import java.util.Map;
 @Component
 public class JwtTokenProvider {
 
-    @Value("${spring.security.jwt.secret}")
+    @Value("${app.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${spring.security.jwt.expiration}")
+    @Value("${app.jwt.expiration}")
     private long jwtExpiration;
 
     private SecretKey getSigningKey() {

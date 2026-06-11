@@ -5,6 +5,7 @@ import com.mine.safety.dto.*;
 import com.mine.safety.service.*;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,6 +26,7 @@ public class SensorDeviceController {
     private final MaintenanceAssigneeRuleService assigneeRuleService;
 
     @GetMapping("/status")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorStatusDTO>> getRealtimeStatus(
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String zoneCode) {
@@ -32,33 +34,39 @@ public class SensorDeviceController {
     }
 
     @GetMapping("/status/{sensorId}")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<SensorStatusDTO> getRealtimeStatusBySensorId(@PathVariable String sensorId) {
         return ApiResponse.success(sensorDeviceService.getRealtimeStatusBySensorId(sensorId));
     }
 
     @GetMapping("/{sensorId}/comm-params")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorCommParamDTO>> getCommParams(@PathVariable String sensorId) {
         return ApiResponse.success(sensorDeviceService.getCommParams(sensorId));
     }
 
     @PostMapping("/{sensorId}/comm-params")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ApiResponse<SensorCommParamDTO> saveCommParam(@PathVariable String sensorId,
                                                           @RequestBody SensorCommParamDTO dto) {
         return ApiResponse.success(sensorDeviceService.saveCommParam(sensorId, dto));
     }
 
     @DeleteMapping("/comm-params/{id}")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ApiResponse<Void> deleteCommParam(@PathVariable Long id) {
         sensorDeviceService.deleteCommParam(id);
         return ApiResponse.success();
     }
 
     @GetMapping("/{sensorId}/calibrations")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorCalibrationRecordDTO>> getCalibrationRecords(@PathVariable String sensorId) {
         return ApiResponse.success(sensorDeviceService.getCalibrationRecords(sensorId));
     }
 
     @PostMapping("/{sensorId}/calibrations")
+    @PreAuthorize("hasAuthority('device:calibration')")
     public ApiResponse<SensorCalibrationRecordDTO> createCalibrationRecord(
             @PathVariable String sensorId,
             @RequestBody SensorCalibrationRecordDTO dto) {
@@ -66,11 +74,13 @@ public class SensorDeviceController {
     }
 
     @GetMapping("/{sensorId}/maintenances")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorMaintenanceRecordDTO>> getMaintenanceRecords(@PathVariable String sensorId) {
         return ApiResponse.success(sensorDeviceService.getMaintenanceRecords(sensorId));
     }
 
     @PostMapping("/{sensorId}/maintenances")
+    @PreAuthorize("hasAuthority('device:maintenance')")
     public ApiResponse<SensorMaintenanceRecordDTO> createMaintenanceRecord(
             @PathVariable String sensorId,
             @RequestBody SensorMaintenanceRecordDTO dto) {
@@ -78,17 +88,20 @@ public class SensorDeviceController {
     }
 
     @GetMapping("/calibration-expiring")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorDTO>> getCalibrationExpiringSensors(
             @RequestParam(defaultValue = "30") int withinDays) {
         return ApiResponse.success(sensorDeviceService.getCalibrationExpiringSensors(withinDays));
     }
 
     @PostMapping("/import")
+    @PreAuthorize("hasAuthority('sensor:edit')")
     public ApiResponse<List<SensorDTO>> batchImport(@RequestParam("file") MultipartFile file) throws IOException {
         return ApiResponse.success(sensorDeviceService.batchImport(file));
     }
 
     @GetMapping("/export")
+    @PreAuthorize("hasAuthority('report:export')")
     public void batchExport(HttpServletResponse response,
                             @RequestParam(required = false) String type,
                             @RequestParam(required = false) String zoneCode) throws IOException {
@@ -99,11 +112,13 @@ public class SensorDeviceController {
     }
 
     @GetMapping("/{sensorId}/shadow")
+    @PreAuthorize("hasAuthority('device:view')")
     public ApiResponse<DeviceShadowDTO> getDeviceShadow(@PathVariable String sensorId) {
         return ApiResponse.success(deviceShadowService.getShadow(sensorId));
     }
 
     @PutMapping("/{sensorId}/shadow/desired")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ApiResponse<DeviceShadowDTO> updateDesiredState(
             @PathVariable String sensorId,
             @RequestBody Map<String, Object> desiredConfig) {
@@ -111,6 +126,7 @@ public class SensorDeviceController {
     }
 
     @PostMapping("/{sensorId}/ota/sampling-interval")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ApiResponse<DeviceShadowDTO> otaUpdateSamplingInterval(
             @PathVariable String sensorId,
             @RequestBody Map<String, Integer> body) {
@@ -122,6 +138,7 @@ public class SensorDeviceController {
     }
 
     @PostMapping("/{sensorId}/ota/thresholds")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ApiResponse<DeviceShadowDTO> otaUpdateThresholds(
             @PathVariable String sensorId,
             @RequestBody Map<String, Object> thresholds) {
@@ -129,6 +146,7 @@ public class SensorDeviceController {
     }
 
     @GetMapping("/fault-orders")
+    @PreAuthorize("hasAuthority('device:view')")
     public ApiResponse<List<DeviceFaultOrderDTO>> getFaultOrders(
             @RequestParam(required = false) String sensorId,
             @RequestParam(required = false) Integer status,
@@ -137,11 +155,13 @@ public class SensorDeviceController {
     }
 
     @GetMapping("/fault-orders/{orderNo}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ApiResponse<DeviceFaultOrderDTO> getFaultOrder(@PathVariable String orderNo) {
         return ApiResponse.success(faultOrderService.getFaultOrder(orderNo));
     }
 
     @PostMapping("/fault-orders")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ApiResponse<DeviceFaultOrderDTO> createFaultOrder(@RequestBody Map<String, String> body) {
         return ApiResponse.success(faultOrderService.createFaultOrder(
                 body.get("sensorId"),
@@ -153,6 +173,7 @@ public class SensorDeviceController {
     }
 
     @PutMapping("/fault-orders/{orderNo}/assign")
+    @PreAuthorize("hasAuthority('device:maintenance')")
     public ApiResponse<DeviceFaultOrderDTO> assignFaultOrder(
             @PathVariable String orderNo,
             @RequestBody Map<String, String> body) {
@@ -161,6 +182,7 @@ public class SensorDeviceController {
     }
 
     @PutMapping("/fault-orders/{orderNo}/resolve")
+    @PreAuthorize("hasAuthority('device:maintenance')")
     public ApiResponse<DeviceFaultOrderDTO> resolveFaultOrder(
             @PathVariable String orderNo,
             @RequestBody Map<String, String> body) {
@@ -169,21 +191,25 @@ public class SensorDeviceController {
     }
 
     @PutMapping("/fault-orders/{orderNo}/close")
+    @PreAuthorize("hasAuthority('device:maintenance')")
     public ApiResponse<DeviceFaultOrderDTO> closeFaultOrder(@PathVariable String orderNo) {
         return ApiResponse.success(faultOrderService.closeFaultOrder(orderNo));
     }
 
     @GetMapping("/assignee-rules")
+    @PreAuthorize("hasAuthority('device:view')")
     public ApiResponse<List<MaintenanceAssigneeRule>> getAssigneeRules() {
         return ApiResponse.success(assigneeRuleService.getAllRules());
     }
 
     @PostMapping("/assignee-rules")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ApiResponse<MaintenanceAssigneeRule> saveAssigneeRule(@RequestBody MaintenanceAssigneeRule rule) {
         return ApiResponse.success(assigneeRuleService.saveRule(rule));
     }
 
     @DeleteMapping("/assignee-rules/{id}")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ApiResponse<Void> deleteAssigneeRule(@PathVariable Long id) {
         assigneeRuleService.deleteRule(id);
         return ApiResponse.success();

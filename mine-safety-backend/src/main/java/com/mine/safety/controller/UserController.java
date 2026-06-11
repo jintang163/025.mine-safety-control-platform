@@ -8,6 +8,7 @@ import com.mine.safety.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +21,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('system:user')")
     public ApiResponse<IPage<SysUser>> getUsers(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Integer status,
@@ -29,6 +31,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('system:user')")
     public ApiResponse<SysUser> getUserById(@PathVariable Long id) {
         SysUser user = userService.getUserById(id);
         if (user == null) {
@@ -38,6 +41,7 @@ public class UserController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('system:user')")
     public ApiResponse<SysUser> createUser(@RequestBody UserCreateRequest request,
                                            HttpServletRequest httpRequest) {
         SysUser user = new SysUser();
@@ -55,6 +59,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('system:user')")
     public ApiResponse<SysUser> updateUser(@PathVariable Long id,
                                            @RequestBody UserUpdateRequest request,
                                            HttpServletRequest httpRequest) {
@@ -74,12 +79,14 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('system:user')")
     public ApiResponse<Void> deleteUser(@PathVariable Long id, HttpServletRequest request) {
         userService.deleteUser(id, request);
         return ApiResponse.success();
     }
 
     @GetMapping("/{id}/roles")
+    @PreAuthorize("hasAuthority('system:user')")
     public ApiResponse<List<SysRole>> getUserRoles(@PathVariable Long id) {
         return ApiResponse.success(userService.getUserRoles(id));
     }

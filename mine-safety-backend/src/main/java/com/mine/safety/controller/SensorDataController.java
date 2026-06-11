@@ -5,6 +5,7 @@ import com.mine.safety.dto.SensorDataDTO;
 import com.mine.safety.service.SensorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -42,6 +43,7 @@ public class SensorDataController {
      * @return 所有传感器的最新数据列表
      */
     @GetMapping("/latest")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorDataDTO>> getAllLatestData() {
         return ApiResponse.success(sensorService.getAllLatestData());
     }
@@ -53,6 +55,7 @@ public class SensorDataController {
      * @return 最新数据（可能为null）
      */
     @GetMapping("/{sensorId}/latest")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<SensorDataDTO> getLatestData(@PathVariable String sensorId) {
         return ApiResponse.success(sensorService.getLatestSensorData(sensorId));
     }
@@ -67,6 +70,7 @@ public class SensorDataController {
      * @return 历史数据列表（按时间倒序）
      */
     @GetMapping("/{sensorId}/history")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorDataDTO>> getHistory(
             @PathVariable String sensorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
@@ -96,6 +100,7 @@ public class SensorDataController {
      * @return 聚合后的数据列表
      */
     @GetMapping("/{sensorId}/aggregated")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorDataDTO>> getAggregatedData(
             @PathVariable String sensorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
@@ -116,6 +121,7 @@ public class SensorDataController {
      * @return 统计结果Map（key: mean/max/min）
      */
     @GetMapping("/{sensorId}/statistics")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<Map<String, Object>> getStatistics(
             @PathVariable String sensorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
@@ -134,6 +140,7 @@ public class SensorDataController {
      * @return 导出结果
      */
     @GetMapping("/{sensorId}/export")
+    @PreAuthorize("hasAuthority('report:export')")
     public ApiResponse<String> exportData(
             @PathVariable String sensorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,

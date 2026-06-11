@@ -6,6 +6,7 @@ import com.mine.safety.service.SystemMetricsService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.lang.management.ManagementFactory;
@@ -24,6 +25,7 @@ public class SystemMonitorController {
     private final OpsAlertService opsAlertService;
 
     @GetMapping("/health")
+    @PreAuthorize("hasAuthority('system:monitor')")
     public ApiResponse<Map<String, Object>> getHealthStatus() {
         Map<String, Object> health = new HashMap<>();
         health.put("status", "UP");
@@ -45,6 +47,7 @@ public class SystemMonitorController {
     }
 
     @GetMapping("/status")
+    @PreAuthorize("hasAuthority('system:monitor')")
     public ApiResponse<SystemStatusDTO> getSystemStatus() {
         SystemStatusDTO status = new SystemStatusDTO();
 
@@ -77,6 +80,7 @@ public class SystemMonitorController {
     }
 
     @PostMapping("/ops-alert/test")
+    @PreAuthorize("hasAuthority('system:config')")
     public ApiResponse<Void> testOpsAlert(@RequestParam String title,
                                           @RequestParam String content,
                                           @RequestParam(defaultValue = "WARNING") String level) {

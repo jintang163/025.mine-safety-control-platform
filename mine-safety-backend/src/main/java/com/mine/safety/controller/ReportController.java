@@ -4,6 +4,7 @@ import com.mine.safety.dto.*;
 import com.mine.safety.service.*;
 import com.mine.safety.domain.TrendAlert;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class ReportController {
     private final TrendAnalysisService trendAnalysisService;
 
     @GetMapping("/history/{sensorId}")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<HistoryStatisticsDTO> getHistoryStatistics(
             @PathVariable String sensorId,
             @RequestParam String startDate,
@@ -29,6 +31,7 @@ public class ReportController {
     }
 
     @GetMapping("/history/type/{sensorType}")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<HistoryStatisticsDTO>> getHistoryStatisticsByType(
             @PathVariable String sensorType,
             @RequestParam(required = false) String zoneCode,
@@ -40,6 +43,7 @@ public class ReportController {
     }
 
     @GetMapping("/history/overview")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<Map<String, Object>> getOverviewStatistics(
             @RequestParam(required = false) String sensorType,
             @RequestParam(required = false) String zoneCode,
@@ -50,12 +54,14 @@ public class ReportController {
     }
 
     @GetMapping("/templates")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<ReportTemplateDTO>> getReportTemplates(
             @RequestParam(required = false) String templateType) {
         return ApiResponse.success(reportService.getReportTemplates(templateType));
     }
 
     @PostMapping("/generate")
+    @PreAuthorize("hasAuthority('report:generate')")
     public ApiResponse<ReportRecordDTO> generateReport(@RequestBody Map<String, String> body) {
         return ApiResponse.success(reportService.generateReport(
                 body.get("templateCode"),
@@ -67,6 +73,7 @@ public class ReportController {
     }
 
     @GetMapping("/records")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<ReportRecordDTO>> getReportRecords(
             @RequestParam(required = false) String reportType,
             @RequestParam(required = false) Integer status,
@@ -77,11 +84,13 @@ public class ReportController {
     }
 
     @GetMapping("/records/{reportNo}")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<ReportRecordDTO> getReportRecord(@PathVariable String reportNo) {
         return ApiResponse.success(reportService.getReportRecord(reportNo));
     }
 
     @PostMapping("/records/{id}/email")
+    @PreAuthorize("hasAuthority('report:generate')")
     public ApiResponse<Void> sendReportByEmail(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
@@ -90,6 +99,7 @@ public class ReportController {
     }
 
     @GetMapping("/trend-alerts")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<TrendAnalysisDTO>> getTrendAlerts(
             @RequestParam(required = false) String sensorType,
             @RequestParam(required = false) String zoneCode,
@@ -98,6 +108,7 @@ public class ReportController {
     }
 
     @PutMapping("/trend-alerts/{alertNo}/acknowledge")
+    @PreAuthorize("hasAuthority('alert:acknowledge')")
     public ApiResponse<TrendAlert> acknowledgeTrendAlert(
             @PathVariable String alertNo,
             @RequestBody Map<String, String> body) {
@@ -106,16 +117,19 @@ public class ReportController {
     }
 
     @GetMapping("/trend-rules")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<TrendRuleDTO>> getTrendRules() {
         return ApiResponse.success(trendAnalysisService.getTrendRules());
     }
 
     @PostMapping("/trend-rules")
+    @PreAuthorize("hasAuthority('threshold:edit')")
     public ApiResponse<TrendRuleDTO> saveTrendRule(@RequestBody TrendRuleDTO dto) {
         return ApiResponse.success(trendAnalysisService.saveTrendRule(dto));
     }
 
     @PostMapping("/trend-check/run")
+    @PreAuthorize("hasAuthority('system:config')")
     public ApiResponse<Void> runTrendCheck() {
         trendAnalysisService.executeTrendCheck();
         return ApiResponse.success();

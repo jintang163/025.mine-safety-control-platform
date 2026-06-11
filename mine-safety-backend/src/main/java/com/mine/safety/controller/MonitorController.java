@@ -7,6 +7,7 @@ import com.mine.safety.service.DataSimulatorService;
 import com.mine.safety.service.SensorService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -60,6 +61,7 @@ public class MonitorController {
      * @return 概览数据Map
      */
     @GetMapping("/overview")
+    @PreAuthorize("hasAuthority('dashboard:view')")
     public ApiResponse<Map<String, Object>> getOverview() {
         Map<String, Object> overview = new HashMap<>();
 
@@ -89,6 +91,7 @@ public class MonitorController {
      * @return 仪表盘数据（包含概览、实时数据、最近报警）
      */
     @GetMapping("/dashboard")
+    @PreAuthorize("hasAuthority('dashboard:view')")
     public ApiResponse<Map<String, Object>> getDashboardData() {
         Map<String, Object> dashboard = new HashMap<>();
 
@@ -105,6 +108,7 @@ public class MonitorController {
      * @return 所有传感器的最新数据列表
      */
     @GetMapping("/real-time")
+    @PreAuthorize("hasAuthority('dashboard:view')")
     public ApiResponse<List<SensorDataDTO>> getRealTimeData() {
         return ApiResponse.success(sensorService.getAllLatestData());
     }
@@ -116,6 +120,7 @@ public class MonitorController {
      * @return 该类型的传感器列表
      */
     @GetMapping("/by-type/{type}")
+    @PreAuthorize("hasAuthority('dashboard:view')")
     public ApiResponse<Map<String, Object>> getDataByType(@PathVariable String type) {
         Map<String, Object> result = new HashMap<>();
         result.put("sensors", sensorService.getSensorsByType(type));
@@ -129,6 +134,7 @@ public class MonitorController {
      * @return 该位置的传感器最新数据列表
      */
     @GetMapping("/by-location/{location}")
+    @PreAuthorize("hasAuthority('dashboard:view')")
     public ApiResponse<List<SensorDataDTO>> getDataByLocation(@PathVariable String location) {
         List<SensorDataDTO> allData = sensorService.getAllLatestData();
         List<SensorDataDTO> filtered = allData.stream()
@@ -143,6 +149,7 @@ public class MonitorController {
      * @return 状态Map（包含running字段）
      */
     @GetMapping("/simulator/status")
+    @PreAuthorize("hasAuthority('dashboard:view')")
     public ApiResponse<Map<String, Object>> getSimulatorStatus() {
         Map<String, Object> status = new HashMap<>();
         status.put("running", dataSimulatorService.isRunning());
@@ -156,6 +163,7 @@ public class MonitorController {
      * @return 模拟器当前状态
      */
     @PostMapping("/simulator/start")
+    @PreAuthorize("hasAuthority('system:config')")
     public ApiResponse<Map<String, Object>> startSimulator() {
         dataSimulatorService.start();
         return getSimulatorStatus();
@@ -168,6 +176,7 @@ public class MonitorController {
      * @return 模拟器当前状态
      */
     @PostMapping("/simulator/stop")
+    @PreAuthorize("hasAuthority('system:config')")
     public ApiResponse<Map<String, Object>> stopSimulator() {
         dataSimulatorService.stop();
         return getSimulatorStatus();
@@ -193,6 +202,7 @@ public class MonitorController {
      * @return 各组件状态Map
      */
     @GetMapping("/system/status")
+    @PreAuthorize("hasAuthority('dashboard:view')")
     public ApiResponse<Map<String, Object>> getSystemStatus() {
         Map<String, Object> status = new HashMap<>();
         status.put("mqtt", "connected");

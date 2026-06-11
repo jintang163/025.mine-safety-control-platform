@@ -4,6 +4,7 @@ import com.mine.safety.dto.ApiResponse;
 import com.mine.safety.dto.SensorDTO;
 import com.mine.safety.service.SensorService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,6 +42,7 @@ public class SensorController {
      * @return 传感器列表
      */
     @GetMapping
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<SensorDTO>> getAllSensors(
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Integer status,
@@ -65,6 +67,7 @@ public class SensorController {
      * @return 传感器详情
      */
     @GetMapping("/{sensorId}")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<SensorDTO> getSensorById(@PathVariable String sensorId) {
         return ApiResponse.success(sensorService.getSensorById(sensorId));
     }
@@ -76,6 +79,7 @@ public class SensorController {
      * @return 创建后的传感器
      */
     @PostMapping
+    @PreAuthorize("hasAuthority('sensor:edit')")
     public ApiResponse<SensorDTO> createSensor(@RequestBody SensorDTO sensorDTO) {
         return ApiResponse.success(sensorService.createSensor(sensorDTO));
     }
@@ -89,6 +93,7 @@ public class SensorController {
      * @return 更新后的传感器
      */
     @PutMapping("/{sensorId}")
+    @PreAuthorize("hasAuthority('sensor:edit')")
     public ApiResponse<SensorDTO> updateSensor(@PathVariable String sensorId,
                                                @RequestBody SensorDTO sensorDTO) {
         return ApiResponse.success(sensorService.updateSensor(sensorId, sensorDTO));
@@ -101,6 +106,7 @@ public class SensorController {
      * @return 空响应
      */
     @DeleteMapping("/{sensorId}")
+    @PreAuthorize("hasAuthority('sensor:delete')")
     public ApiResponse<Void> deleteSensor(@PathVariable String sensorId) {
         sensorService.deleteSensor(sensorId);
         return ApiResponse.success();
@@ -112,6 +118,7 @@ public class SensorController {
      * @return 传感器类型列表（GAS/DUST/CO/TEMPERATURE/WIND）
      */
     @GetMapping("/types")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<String>> getSensorTypes() {
         return ApiResponse.success(List.of("GAS", "DUST", "CO", "TEMPERATURE", "WIND"));
     }
@@ -122,6 +129,7 @@ public class SensorController {
      * @return 协议列表（MODBUS_RTU/MODBUS_TCP/OPC_UA/CAN/4G/5G）
      */
     @GetMapping("/protocols")
+    @PreAuthorize("hasAuthority('sensor:view')")
     public ApiResponse<List<String>> getProtocols() {
         return ApiResponse.success(List.of("MODBUS_RTU", "MODBUS_TCP", "OPC_UA", "CAN", "4G", "5G"));
     }

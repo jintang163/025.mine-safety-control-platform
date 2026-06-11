@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class LinkageActionController {
     private final RuleActionRelationRepository relationRepository;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<IPage<LinkageActionDTO>> getActions(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -36,6 +38,7 @@ public class LinkageActionController {
     }
 
     @GetMapping("/enabled")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<LinkageActionDTO>> getEnabledActions() {
         List<LinkageAction> actions = actionRepository.selectList(
                 new LambdaQueryWrapper<LinkageAction>().eq(LinkageAction::getEnabled, true));
@@ -43,6 +46,7 @@ public class LinkageActionController {
     }
 
     @GetMapping("/type/{actionType}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<LinkageActionDTO>> getActionsByType(@PathVariable String actionType) {
         List<LinkageAction> actions = actionRepository.selectList(
                 new LambdaQueryWrapper<LinkageAction>().eq(LinkageAction::getActionType, actionType).eq(LinkageAction::getEnabled, true));
@@ -50,12 +54,14 @@ public class LinkageActionController {
     }
 
     @GetMapping("/rule/{ruleId}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<List<LinkageActionDTO>> getActionsByRuleId(@PathVariable Long ruleId) {
         List<LinkageAction> actions = actionRepository.findActionsByRuleId(ruleId);
         return ResponseDTO.success(actions.stream().map(LinkageActionDTO::fromEntity).toList());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<LinkageActionDTO> getActionById(@PathVariable Long id) {
         LinkageAction action = actionRepository.selectById(id);
         if (action == null) {
@@ -65,6 +71,7 @@ public class LinkageActionController {
     }
 
     @GetMapping("/code/{actionCode}")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<LinkageActionDTO> getActionByCode(@PathVariable String actionCode) {
         LinkageAction action = actionRepository.selectOne(
                 new LambdaQueryWrapper<LinkageAction>().eq(LinkageAction::getActionCode, actionCode));
@@ -75,6 +82,7 @@ public class LinkageActionController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<LinkageActionDTO> createAction(@RequestBody LinkageActionDTO dto) {
         if (actionRepository.selectCount(new LambdaQueryWrapper<LinkageAction>().eq(LinkageAction::getActionCode, dto.getActionCode())) > 0) {
             return ResponseDTO.error("动作编码已存在");
@@ -88,6 +96,7 @@ public class LinkageActionController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<LinkageActionDTO> updateAction(@PathVariable Long id, @RequestBody LinkageActionDTO dto) {
         LinkageAction action = actionRepository.selectById(id);
         if (action == null) {
@@ -113,6 +122,7 @@ public class LinkageActionController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('device:edit')")
     public ResponseDTO<Void> deleteAction(@PathVariable Long id) {
         if (actionRepository.selectById(id) == null) {
             return ResponseDTO.error("动作不存在");
@@ -125,6 +135,7 @@ public class LinkageActionController {
     }
 
     @GetMapping("/statistics")
+    @PreAuthorize("hasAuthority('device:view')")
     public ResponseDTO<Map<String, Object>> getActionStatistics() {
         long total = actionRepository.selectCount(null);
         long enabledCount = actionRepository.selectCount(new LambdaQueryWrapper<LinkageAction>().eq(LinkageAction::getEnabled, true));

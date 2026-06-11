@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,6 +29,7 @@ public class AlertRuleController {
     private final RuleEngineService ruleEngineService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('alert:view')")
     public ResponseDTO<IPage<AlertRuleDTO>> getRules(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -38,12 +40,14 @@ public class AlertRuleController {
     }
 
     @GetMapping("/enabled")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ResponseDTO<List<AlertRuleDTO>> getEnabledRules() {
         List<AlertRuleDefinition> rules = ruleEngineService.getEnabledRules();
         return ResponseDTO.success(rules.stream().map(AlertRuleDTO::fromEntity).toList());
     }
 
     @GetMapping("/type/{ruleType}")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ResponseDTO<List<AlertRuleDTO>> getRulesByType(@PathVariable String ruleType) {
         List<AlertRuleDefinition> rules = ruleRepository.selectList(
                 new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleType, ruleType).eq(AlertRuleDefinition::getEnabled, true));
@@ -51,6 +55,7 @@ public class AlertRuleController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ResponseDTO<AlertRuleDTO> getRuleById(@PathVariable Long id) {
         AlertRuleDefinition rule = ruleRepository.selectById(id);
         if (rule == null) {
@@ -60,6 +65,7 @@ public class AlertRuleController {
     }
 
     @GetMapping("/code/{ruleCode}")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ResponseDTO<AlertRuleDTO> getRuleByCode(@PathVariable String ruleCode) {
         AlertRuleDefinition rule = ruleRepository.selectOne(
                 new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleCode, ruleCode));
@@ -70,6 +76,7 @@ public class AlertRuleController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ResponseDTO<AlertRuleDTO> createRule(@RequestBody AlertRuleDTO dto) {
         if (ruleRepository.selectCount(new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getRuleCode, dto.getRuleCode())) > 0) {
             return ResponseDTO.error("规则编码已存在");
@@ -84,6 +91,7 @@ public class AlertRuleController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ResponseDTO<AlertRuleDTO> updateRule(@PathVariable Long id, @RequestBody AlertRuleDTO dto) {
         AlertRuleDefinition rule = ruleRepository.selectById(id);
         if (rule == null) {
@@ -110,6 +118,7 @@ public class AlertRuleController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ResponseDTO<Void> deleteRule(@PathVariable Long id) {
         if (ruleRepository.selectById(id) == null) {
             return ResponseDTO.error("规则不存在");
@@ -122,6 +131,7 @@ public class AlertRuleController {
     }
 
     @PutMapping("/{id}/enable")
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ResponseDTO<AlertRuleDTO> enableRule(@PathVariable Long id) {
         AlertRuleDefinition rule = ruleRepository.selectById(id);
         if (rule == null) {
@@ -134,6 +144,7 @@ public class AlertRuleController {
     }
 
     @PutMapping("/{id}/disable")
+    @PreAuthorize("hasAuthority('alert:edit')")
     public ResponseDTO<AlertRuleDTO> disableRule(@PathVariable Long id) {
         AlertRuleDefinition rule = ruleRepository.selectById(id);
         if (rule == null) {
@@ -146,6 +157,7 @@ public class AlertRuleController {
     }
 
     @PostMapping("/reload")
+    @PreAuthorize("hasAuthority('system:config')")
     public ResponseDTO<Map<String, Object>> reloadRules() {
         ruleEngineService.reloadRules();
         int count = ruleEngineService.getEnabledRules().size();
@@ -156,6 +168,7 @@ public class AlertRuleController {
     }
 
     @GetMapping("/statistics")
+    @PreAuthorize("hasAuthority('alert:view')")
     public ResponseDTO<Map<String, Object>> getRuleStatistics() {
         long total = ruleRepository.selectCount(null);
         long enabledCount = ruleRepository.selectCount(new LambdaQueryWrapper<AlertRuleDefinition>().eq(AlertRuleDefinition::getEnabled, true));
