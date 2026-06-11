@@ -50,6 +50,8 @@ public class MqttMessageListener implements MqttCallback {
     @Lazy
     private final DeviceShadowService deviceShadowService;
 
+    private final SystemMetricsService systemMetricsService;
+
     /**
      * 连接丢失回调
      * 当MQTT连接意外断开时触发，MqttConfig会自动重连
@@ -59,8 +61,8 @@ public class MqttMessageListener implements MqttCallback {
     @Override
     public void connectionLost(Throwable cause) {
         log.error("MQTT连接丢失，原因: {}", cause.getMessage());
+        systemMetricsService.setMqttConnected(false);
         // MqttConfig已配置automaticReconnect=true，会自动尝试重连
-        // 这里仅记录日志，无需额外处理
     }
 
     /**
@@ -129,6 +131,8 @@ public class MqttMessageListener implements MqttCallback {
      */
     private void handleSensorData(String topic, String payload) {
         try {
+            io.micrometer.core.instrument.Timer.Sample sample = systemMetricsService.startSensorDataProcessing();
+
             // 从主题中提取sensorId
             // 主题格式: mine/sensor/data/{sensorId}
             String sensorId = extractSensorIdFromTopic(topic);
@@ -147,6 +151,13 @@ public class MqttMessageListener implements MqttCallback {
                 sensorDataDTO.setTimestamp(LocalDateTime.now());
             }
 
+            // 计算数据延迟
+            long delayMs = System.currentTimeMillis() -
+                    java.sql.Timestamp.valueOf(sensorDataDTO.getTimestamp()).getTime();
+            if (delayMs > 0) {
+                systemMetricsService.setSensorDataDelay(delayMs);
+            }
+
             // 记录日志（DEBUG级别，生产环境可关闭）
             if (log.isTraceEnabled()) {
                 log.trace("解析传感器数据 - 传感器: {}, 类型: {}, 值: {}{}",
@@ -158,6 +169,14 @@ public class MqttMessageListener implements MqttCallback {
 
             // 发送到Kafka原始数据Topic
             kafkaProducerService.sendRawSensorData(sensorDataDTO);
+
+            // 更新指标
+            systemMetricsService.incrementSensorDataReceived();
+            systemMetricsService.stopSensorDataProcessing(sample);
+
+            if (!systemMetricsService.isMqttConnected()) {
+                systemMetricsService.setMqttConnected(true);
+            }
 
         } catch (Exception e) {
             log.error("解析传感器数据失败 - 主题: {}, 错误: {}", topic, e.getMessage(), e);

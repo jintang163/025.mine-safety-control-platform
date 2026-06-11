@@ -7,6 +7,28 @@ spring:
   application:
     name: mine-safety-backend
 
+  security:
+    jwt:
+      secret: mine-safety-platform-jwt-secret-key-2024-very-long-secret
+      expiration: 86400
+      header: Authorization
+      prefix: "Bearer "
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+
   datasource:
     url: jdbc:mysql://localhost:3306/mine_safety?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
     username: mine_safety
@@ -344,6 +366,32 @@ app:
     enabled: true
     check-interval-days: 1
     default-severity: WARNING
+
+  ops-alert:
+    enabled: true
+    data-delay-threshold-ms: 5000
+    check-interval-seconds: 30
+    mqtt-reconnect-alert: true
+    notify-channels: DINGTALK,SMS
+    dingtalk:
+      enabled: false
+      webhook-url: ""
+      secret: ""
+      at-mobiles: ""
+      at-all: false
+    sms:
+      enabled: false
+      provider: aliyun
+      access-key: ""
+      secret-key: ""
+      sign-name: 煤矿安全平台
+      template-code: ""
+      phones: ""
+
+  audit:
+    enabled: true
+    log-operations: true
+    retain-days: 180
 
 minio:
   endpoint: http://localhost:9000
